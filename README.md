@@ -27,7 +27,8 @@ pip install "markdown_hero[tokenizers]"
 | `lint(md)` | Detecta headings pulados, anchors duplicados, fences abertos. |
 | CLI `markdown-hero` | Acesso pela linha de comando. |
 
-Veja `docs/reference.md` para a referência técnica completa.
+Veja `docs/reference.md` para a referência técnica completa e
+`docs/helpers.md` para o índice de utilitários internos.
 
 ## Exemplo rápido
 

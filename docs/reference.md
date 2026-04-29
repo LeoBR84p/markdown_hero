@@ -18,6 +18,7 @@ e exemplos de uso. A versão atual é **0.1.0**, Python ≥ 3.10, dialeto-alvo
 10. [CLI](#cli)
 11. [Modelos de dados](#modelos)
 12. [Decisões de design](#design)
+13. [Limites e segurança](#limites)
 
 ---
 
@@ -466,3 +467,40 @@ class Chunk:
   `---` em linhas próprias.
 - **Ordem dos resultados**: `extract_*` retorna na ordem de aparição no documento,
   com `line` 1-based.
+
+---
+
+<a id="limites"></a>
+
+## 13. Limites e considerações de segurança
+
+### Tamanho de arquivo
+
+`markdown_hero` carrega o documento inteiro em memória (`Path.read_text`).
+Não há suporte a streaming. Para documentos típicos (até alguns MB) isso
+é adequado e mantém a API simples; para arquivos muito grandes
+(centenas de MB), recomenda-se quebrar previamente o conteúdo com
+ferramentas externas antes de chamar a biblioteca.
+
+### `markdown_break` com `is_regex=True` e input não confiável
+
+Quando `is_regex=True`, o argumento `delimiter` é compilado diretamente
+via `re.compile`. **Não passe input não confiável** (vindo de usuários
+finais sem validação) como regex: padrões maliciosos podem causar
+*ReDoS* (exponential backtracking). Se a entrada vem de um usuário,
+mantenha o default `is_regex=False` ou valide o padrão antes.
+
+### Frontmatter e YAML
+
+`extract_frontmatter` usa `yaml.safe_load` (não `yaml.load`), o que
+impede deserialização de objetos Python arbitrários. Mesmo assim,
+valide o conteúdo antes de usar valores em operações sensíveis (ex.:
+montar paths a partir de `metadata["filename"]`).
+
+### Limitação do parser
+
+A biblioteca usa expressões regulares para o reconhecimento estrutural
+em vez de um parser CommonMark/GFM completo. Cobre o subconjunto
+documentado em `docs/reference.md` mas pode divergir de implementações
+de referência em casos extremos (listas profundamente aninhadas,
+HTML inline complexo, links de referência em múltiplas linhas).

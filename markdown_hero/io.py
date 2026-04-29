@@ -157,6 +157,12 @@ def markdown_break(
 
     Raises:
         FrontmatterError: When the source file's frontmatter is invalid.
+
+    Note:
+        With ``is_regex=True`` the pattern is compiled directly. Do not
+        pass untrusted user input as a regex: malicious patterns can
+        trigger catastrophic backtracking (ReDoS). Keep ``is_regex=False``
+        when the delimiter comes from an end user.
     """
     raw = _read(path)
     body, fm = remove_frontmatter(raw)
