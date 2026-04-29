@@ -81,7 +81,20 @@ def extract_frontmatter(md: str) -> dict[str, Any]:
 
 
 def remove_frontmatter(md: str) -> tuple[str, dict[str, Any]]:
-    """Remove o frontmatter e devolve (corpo, metadados)."""
+    """Split a Markdown document into body text and frontmatter metadata.
+
+    Args:
+        md: Full Markdown content as text.
+
+    Returns:
+        A tuple ``(body, metadata)`` where ``body`` is the Markdown with
+        the frontmatter block stripped and ``metadata`` is the parsed
+        YAML mapping (``{}`` when no frontmatter is present).
+
+    Raises:
+        FrontmatterError: When the YAML inside the delimiters is invalid
+            or does not parse to a mapping.
+    """
     m = _FRONTMATTER_RE.match(md)
     if not m:
         return md, {}
@@ -103,6 +116,18 @@ def _strip_for_scan(md: str) -> str:
 
 
 def extract_headings(md: str) -> list[Heading]:
+    """Return every ATX heading in the document, in source order.
+
+    Headings inside fenced code blocks are ignored. The ``anchor``
+    attribute is the GitHub-style slug derived from the heading text.
+
+    Args:
+        md: Full Markdown content as text.
+
+    Returns:
+        A list of ``Heading`` instances. Empty when the document has no
+        headings.
+    """
     body, _ = remove_frontmatter(md)
     scan = _strip_for_scan(body)
     headings: list[Heading] = []
@@ -121,6 +146,18 @@ def extract_headings(md: str) -> list[Heading]:
 
 
 def extract_links(md: str) -> list[Link]:
+    """Return all inline and autolink links from the document.
+
+    Reference-style links and links inside fenced code blocks are not
+    returned. ``Link.type`` indicates the kind of link found.
+
+    Args:
+        md: Full Markdown content as text.
+
+    Returns:
+        A list of ``Link`` instances in source order with line numbers
+        starting at 1.
+    """
     body, _ = remove_frontmatter(md)
     scan = _strip_for_scan(body)
     out: list[Link] = []
@@ -143,6 +180,16 @@ def extract_links(md: str) -> list[Link]:
 
 
 def extract_images(md: str) -> list[Image]:
+    """Return every inline image reference from the document.
+
+    Images inside fenced code blocks are ignored.
+
+    Args:
+        md: Full Markdown content as text.
+
+    Returns:
+        A list of ``Image`` instances in source order.
+    """
     body, _ = remove_frontmatter(md)
     scan = _strip_for_scan(body)
     out: list[Image] = []
@@ -160,6 +207,18 @@ def extract_images(md: str) -> list[Image]:
 
 
 def extract_code_blocks(md: str, *, language: str | None = None) -> list[CodeBlock]:
+    """Return fenced code blocks, optionally filtered by language tag.
+
+    Args:
+        md: Full Markdown content as text.
+        language: When provided, only blocks whose info string matches
+            this value exactly are returned. Pass ``None`` to return
+            every block.
+
+    Returns:
+        A list of ``CodeBlock`` instances in source order. Empty when no
+        block matches.
+    """
     body, _ = remove_frontmatter(md)
     out: list[CodeBlock] = []
     for m in _FENCED_RE.finditer(body):
@@ -172,6 +231,20 @@ def extract_code_blocks(md: str, *, language: str | None = None) -> list[CodeBlo
 
 
 def extract_tables(md: str) -> list[Table]:
+    """Return GFM tables found in the document.
+
+    The function recognizes pipe-delimited tables with a separator row.
+    Tables inside fenced code blocks are ignored. Cell content is kept
+    verbatim except for surrounding whitespace, which is trimmed.
+
+    Args:
+        md: Full Markdown content as text.
+
+    Returns:
+        A list of ``Table`` instances. Each ``Table`` carries headers,
+        body rows, alignment per column, and the source line number of
+        the header row.
+    """
     body, _ = remove_frontmatter(md)
     scan = _strip_for_scan(body)
     lines = scan.split("\n")
@@ -222,7 +295,20 @@ def _parse_align(sep: str) -> list[str]:
 
 
 def build_toc(md: str, *, max_depth: int = 3) -> str:
-    """Gera um sumário em Markdown a partir dos headings."""
+    """Build a Markdown table of contents from the document headings.
+
+    Each entry is a bullet with a relative link to the heading anchor.
+    Indentation reflects heading level.
+
+    Args:
+        md: Full Markdown content as text.
+        max_depth: Largest heading level to include. Defaults to ``3``,
+            so H1, H2, and H3 are listed.
+
+    Returns:
+        A Markdown string with one bullet per heading. Returns ``""``
+        when the document has no qualifying headings.
+    """
     out: list[str] = []
     for h in extract_headings(md):
         if h.level > max_depth:

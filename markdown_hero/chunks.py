@@ -56,16 +56,51 @@ def extract_chunks(
     source: str | None = None,
     min_tokens: int = 0,
 ) -> list[Chunk]:
-    """Divide um documento Markdown em chunks com metadados estruturais.
+    """Split a Markdown document into chunks with rich structural metadata.
 
-    Estratégias:
-        - ``structural``: respeita hierarquia de headings.
-        - ``semantic``: divide por parágrafo, agrupando até ``max_tokens``.
-        - ``fixed``: corte rígido por tokens.
-        - ``hybrid``: estrutural + sub-split por tokens dentro da seção.
+    The default behavior is selected by ``purpose``: ``rag`` uses a
+    hybrid strategy with overlap (good for retrieval), ``finetune`` and
+    ``summary`` keep section-aligned chunks without overlap, and
+    ``generic`` defaults to a plain structural split. Pass ``strategy``
+    to override.
 
-    Cada chunk inclui ``heading_path`` (breadcrumb), offsets, contagem de tokens
-    e tipo de conteúdo dominante.
+    Strategies:
+        - ``structural``: split by heading hierarchy; each section
+          becomes one chunk and the breadcrumb is preserved.
+        - ``semantic``: group paragraphs up to ``max_tokens`` regardless
+          of headings.
+        - ``fixed``: hard token-based slicing (rarely useful by itself).
+        - ``hybrid``: structural split, then sub-divide oversized
+          sections by paragraph while keeping overlap inside the same
+          section only.
+
+    Fenced code blocks and tables are never split mid-content. A single
+    block that exceeds ``max_tokens`` becomes a chunk with
+    ``oversized=True``.
+
+    Args:
+        md: Full Markdown content as text.
+        strategy: Override the strategy chosen by ``purpose``.
+        purpose: Default profile. One of ``rag``, ``finetune``,
+            ``summary``, ``generic``.
+        max_tokens: Override the default token budget per chunk. Pass
+            ``0`` to use the default for the selected ``purpose``.
+        overlap: Token overlap between adjacent chunks of the same
+            section. Ignored across heading boundaries.
+        tokenizer: Custom token-counting function. When omitted, uses
+            ``tiktoken`` (cl100k_base) if installed, otherwise an
+            approximation of ``len(text) / 3.5`` tokens.
+        source: Optional identifier (e.g. file path) recorded on every
+            returned chunk for downstream traceability.
+        min_tokens: When greater than zero, structural sections smaller
+            than this threshold are merged into the previous chunk.
+
+    Returns:
+        A list of ``Chunk`` instances, each with ``heading_path``,
+        offsets, token count, and a content type classification.
+
+    Raises:
+        FrontmatterError: When the document's frontmatter is malformed.
     """
     if not md.strip():
         return []

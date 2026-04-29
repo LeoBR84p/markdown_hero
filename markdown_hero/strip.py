@@ -1,4 +1,9 @@
-"""Função strip: reduz Markdown a texto puro normalizado."""
+"""Reduce Markdown content to a normalized plain-text representation.
+
+Public surface is :func:`strip`. This module is intentionally focused:
+it does not preserve any structure (paragraphs, headings, lists). For a
+lighter conversion that keeps paragraphs, see ``transform.md_to_plain``.
+"""
 from __future__ import annotations
 
 import re
@@ -32,15 +37,37 @@ def strip(
     keep_math: bool = False,
     keep_latex_text: bool = False,
 ) -> str:
-    """Reduz Markdown a um texto plano em minúsculas, sem acentos nem pontuação.
+    """Reduce Markdown to a single line of normalized plain text.
 
-    Parâmetros:
-        text: conteúdo Markdown.
-        keep_numbers: preserva dígitos (default True).
-        keep_math: preserva sinais matemáticos (`=`, `<`, `>`, `≤`, `≥`, `≠`,
-            `±`, `×`, `÷`, `%`, `°`, `+`, `/`). Default False.
-        keep_latex_text: quando True, desembrulha o conteúdo de fórmulas LaTeX
-            inline `$...$` em vez de descartá-lo.
+    The output is lowercase, free of diacritics (NFKD normalization),
+    Markdown markup, punctuation, and runs of whitespace collapse to a
+    single space. The function is multilingual: it relies on Unicode
+    category data, not on a per-language table.
+
+    Math symbols (``=``, ``<``, ``>`` and similar) are deleted *without*
+    leaving a space behind, so ``p=2`` becomes ``p2``. This keeps tokens
+    that read together as a unit. Pass ``keep_math=True`` to preserve
+    those symbols verbatim instead.
+
+    Args:
+        text: Markdown content. May be empty.
+        keep_numbers: When True (default), digits are preserved.
+            When False, every digit run is removed.
+        keep_math: When True, the math symbols ``= < > ≤ ≥ ≠ ± × ÷ %``
+            ``° + /`` are preserved verbatim. When False (default), they
+            are deleted with no space replacement.
+        keep_latex_text: When True, LaTeX delimiters ``$...$`` and
+            ``$$...$$`` are removed but the formula text is kept. When
+            False (default), the entire formula is dropped.
+
+    Returns:
+        A single-line lowercase string. Empty input yields ``""``.
+
+    Example:
+        >>> strip("**Olá**, [docs](u)! p=2")
+        'ola docs p2'
+        >>> strip("p=1 e p=2", keep_math=True)
+        'p=1 e p=2'
     """
     if not text:
         return ""

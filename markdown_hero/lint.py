@@ -1,4 +1,9 @@
-"""Lint, validação e métricas para Markdown."""
+"""Lint rules and content metrics for Markdown documents.
+
+This module produces structural diagnostics (skipped heading levels,
+duplicate anchors, malformed code fences, empty links). It does not
+attempt to validate prose or check link targets against the network.
+"""
 from __future__ import annotations
 
 import re
@@ -13,6 +18,16 @@ Severity = Literal["info", "warning", "error"]
 
 @dataclass
 class Issue:
+    """A single lint diagnostic.
+
+    Attributes:
+        rule: Short identifier of the rule that produced the issue.
+        message: Human-readable description of what was found.
+        line: 1-based line number where the issue was detected.
+        severity: One of ``"info"``, ``"warning"`` (default), or
+            ``"error"``. Errors should typically fail CI pipelines.
+    """
+
     rule: str
     message: str
     line: int
@@ -20,8 +35,23 @@ class Issue:
 
 
 def lint(md: str) -> list[Issue]:
-    """Lista problemas estruturais comuns: headings pulados, anchors duplicados,
-    links sem texto, blocos fenced não fechados."""
+    """Run structural lint rules over a Markdown document.
+
+    Detected issues:
+
+    - ``heading-skip``: a heading level jumps by more than one (e.g. H1
+      directly to H3).
+    - ``duplicate-anchor``: two headings produce the same anchor slug.
+    - ``empty-link-text`` / ``empty-link-url``: malformed inline links.
+    - ``unclosed-fence``: a code fence is opened but never closed.
+
+    Args:
+        md: Full Markdown content as text.
+
+    Returns:
+        A list of ``Issue`` objects in source order. Empty when the
+        document passes every rule.
+    """
     issues: list[Issue] = []
     headings = extract_headings(md)
 
@@ -68,11 +98,29 @@ def lint(md: str) -> list[Issue]:
 
 
 def word_count(md: str, *, ignore_code: bool = True) -> int:
-    """Contagem de palavras do conteúdo textual."""
+    """Count textual words in a Markdown document.
+
+    Args:
+        md: Full Markdown content as text.
+        ignore_code: When True (default), code blocks and inline code
+            are excluded from the count.
+
+    Returns:
+        The number of whitespace-separated words.
+    """
     text = md_to_plain(md) if ignore_code else md
     return len([w for w in re.split(r"\s+", text) if w])
 
 
 def reading_time(md: str, *, wpm: int = 200) -> float:
-    """Estimativa de leitura em minutos."""
+    """Estimate reading time for a Markdown document.
+
+    Args:
+        md: Full Markdown content as text.
+        wpm: Reading speed in words per minute. Defaults to ``200``,
+            which approximates an average adult reader on prose.
+
+    Returns:
+        Estimated reading time in minutes.
+    """
     return word_count(md) / max(1, wpm)

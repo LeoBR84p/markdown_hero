@@ -49,12 +49,31 @@ def markdown_append(
     frontmatter: FrontmatterAppendMode = "merge",
     headings: HeadingsMode = "shift",
 ) -> Path:
-    """Concatena vários arquivos Markdown em um único.
+    """Concatenate several Markdown files into a single output file.
 
-    Veja ``docs/reference.md`` para semântica de ``frontmatter`` e ``headings``.
+    Headings can be shifted to avoid duplicate H1s, wrapped under a new
+    H1 per file, or preserved verbatim. Frontmatter from each input is
+    merged, kept from the first file, dropped, or preserved as-is.
+
+    Args:
+        *paths: Two or more input file paths in concatenation order.
+        output: Destination file path. Parent directories are created
+            on demand.
+        separator: Text inserted between consecutive bodies.
+        frontmatter: How to combine YAML frontmatter blocks. One of
+            ``"first"``, ``"merge"`` (default), ``"drop"``, ``"all"``.
+        headings: How to handle heading levels across files. One of
+            ``"preserve"``, ``"shift"`` (default), ``"wrap"``.
+
+    Returns:
+        The ``Path`` to the written output file.
+
+    Raises:
+        ValueError: When called without any input paths.
+        FrontmatterError: When any input file's frontmatter is invalid.
     """
     if not paths:
-        raise ValueError("markdown_append: pelo menos um arquivo é necessário")
+        raise ValueError("markdown_append: at least one input path is required")
 
     bodies: list[str] = []
     fms: list[dict[str, Any]] = []
@@ -109,11 +128,37 @@ def markdown_break(
     frontmatter: FrontmatterBreakMode = "replicate",
     is_regex: bool = False,
 ) -> list[Path]:
-    """Divide um arquivo Markdown em partes nos pontos onde o(s) delimitador(es) ocorre(m).
+    """Split a Markdown file into N+1 parts wherever the delimiter occurs.
 
-    ``delimiter`` aceita string, regex compilado, ou lista misturando os dois.
-    ``is_regex=True`` força interpretação como regex de uma string.
-    ``include_delimiter`` controla onde o delimitador termina/começa.
+    Each generated part is written with surrounding whitespace trimmed
+    so the previous part ends at the last visible character before the
+    delimiter and the next part starts at the first visible character
+    after it.
+
+    Args:
+        path: Source Markdown file.
+        delimiter: The boundary marker. Accepts a literal string, a
+            compiled regex, or an iterable mixing both.
+        include_delimiter: Where the delimiter text lands. ``"before"``
+            attaches it to the previous part, ``"after"`` to the next,
+            ``"none"`` discards it.
+        output_dir: Directory that will receive the parts. Created on
+            demand.
+        name_pattern: Format string with ``{stem}`` (source basename)
+            and ``{i}`` (zero-based index).
+        frontmatter: Frontmatter handling per part. ``"replicate"``
+            (default) writes the original block on every part with
+            ``part`` and ``part_of`` injected; ``"first"`` keeps it on
+            the first part only; ``"drop"`` discards it.
+        is_regex: When True, a string ``delimiter`` is treated as a
+            regex pattern (with ``re.MULTILINE`` enabled). Compiled
+            patterns are always honored as-is.
+
+    Returns:
+        A list of ``Path`` objects pointing to the written parts.
+
+    Raises:
+        FrontmatterError: When the source file's frontmatter is invalid.
     """
     raw = _read(path)
     body, fm = remove_frontmatter(raw)
@@ -184,8 +229,27 @@ def markdown_merge(
     rebuild_toc: bool = False,
     separator: str = "\n\n",
 ) -> Path:
-    """Append “inteligente”: concatena, opcionalmente desduplica seções com mesmo
-    heading e regenera o sumário."""
+    """Concatenate Markdown files with optional dedupe and TOC rebuilding.
+
+    Wraps :func:`markdown_append` (with frontmatter merging and heading
+    shift) and adds two optional post-processing steps: removing
+    consecutive sections that share the same heading and prepending a
+    rebuilt table of contents wrapped in ``<!-- TOC -->`` markers.
+
+    Args:
+        *paths: Two or more input file paths in concatenation order.
+        output: Destination file path.
+        dedupe_headings: When True (default), consecutive sections with
+            an identical heading are deduplicated.
+        rebuild_toc: When True, a fresh TOC is inserted at the top.
+        separator: Text inserted between consecutive bodies.
+
+    Returns:
+        The ``Path`` to the written output file.
+
+    Raises:
+        FrontmatterError: When any input file's frontmatter is invalid.
+    """
     from .extract import build_toc
 
     out_path = markdown_append(

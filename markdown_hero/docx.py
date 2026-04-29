@@ -43,13 +43,32 @@ def word_format(
     template: str | Path | None = None,
     style_overrides: dict[str, Any] | None = None,
 ) -> Path:
-    """Converte Markdown para .docx aplicando o conjunto de estilos definido.
+    """Render Markdown to a Word ``.docx`` file with a fixed style set.
+
+    The renderer maps headings, paragraphs, lists, blockquotes, fenced
+    code, inline formatting (bold, italic, strike, code, links), tables,
+    captions, and horizontal rules to native Word styles. Tables repeat
+    their header row across page breaks and captions are centered above
+    the table.
 
     Args:
-        md: string Markdown ou caminho para arquivo.
-        output_path: destino do .docx.
-        template: caminho opcional para template .docx (usa seus estilos).
-        style_overrides: sobrescreve chaves do dicionário de estilos default.
+        md: Markdown content as text or a path to a Markdown file.
+        output_path: Destination of the generated ``.docx``. Parent
+            directories are created on demand.
+        template: Optional path to a ``.docx`` template whose styles are
+            used as the base. When omitted, a blank document is used.
+        style_overrides: Mapping that shallow-merges over
+            ``DEFAULT_STYLES``. Useful to customize fonts, colors, or
+            sizes without supplying a full template.
+
+    Returns:
+        The ``Path`` to the written ``.docx`` file.
+
+    Raises:
+        FrontmatterError: When the input frontmatter is invalid.
+        MarkdownStructureError: When the parser encounters a block kind
+            it cannot render. This indicates an internal bug, not a
+            problem with the user input.
     """
     text = _read_md(md)
     body, _ = remove_frontmatter(text)

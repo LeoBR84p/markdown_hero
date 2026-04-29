@@ -11,6 +11,8 @@ from typing import Any, Literal
 
 @dataclass
 class Link:
+    """An inline, reference, or autolink reference found in Markdown."""
+
     text: str
     url: str
     title: str | None = None
@@ -20,6 +22,8 @@ class Link:
 
 @dataclass
 class Image:
+    """An inline image reference found in Markdown."""
+
     alt: str
     url: str
     title: str | None = None
@@ -28,6 +32,8 @@ class Image:
 
 @dataclass
 class Table:
+    """A GFM-style table, ready for rendering or row-by-row processing."""
+
     headers: list[str]
     rows: list[list[str]]
     line: int = 0
@@ -36,6 +42,8 @@ class Table:
 
 @dataclass
 class CodeBlock:
+    """A fenced code block with its info-string language tag."""
+
     code: str
     language: str | None = None
     line: int = 0
@@ -44,6 +52,8 @@ class CodeBlock:
 
 @dataclass
 class Heading:
+    """An ATX heading with the slugified anchor used for linking."""
+
     level: int
     text: str
     line: int = 0
@@ -52,6 +62,23 @@ class Heading:
 
 @dataclass
 class Chunk:
+    """A chunk produced by :func:`markdown_hero.extract_chunks`.
+
+    Attributes:
+        text: Chunk content as text.
+        heading_path: Breadcrumb of headings the chunk lives under,
+            from outermost to innermost.
+        char_start: Inclusive character offset in the source document.
+        char_end: Exclusive character offset in the source document.
+        token_count: Token count according to the active tokenizer.
+        type: Dominant content type of the chunk.
+        source: Optional document identifier passed to ``extract_chunks``.
+        index: Zero-based position in the returned list.
+        oversized: True when the chunk exceeds the requested
+            ``max_tokens`` and could not be subdivided further.
+        metadata: Free-form mapping for downstream consumers.
+    """
+
     text: str
     heading_path: list[str] = field(default_factory=list)
     char_start: int = 0
