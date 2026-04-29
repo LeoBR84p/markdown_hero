@@ -27,3 +27,16 @@ def test_word_count_ignores_code():
 def test_reading_time():
     md = " ".join(["palavra"] * 400)
     assert abs(reading_time(md, wpm=200) - 2.0) < 0.01
+
+
+def test_detects_empty_link_text():
+    md = "see [](https://x.com) for details"
+    issues = lint(md)
+    assert any(i.rule == "empty-link-text" for i in issues)
+
+
+def test_detects_empty_link_url():
+    md = "see [docs](#) and [more]() for details"
+    issues = lint(md)
+    rules = [i.rule for i in issues]
+    assert rules.count("empty-link-url") >= 1

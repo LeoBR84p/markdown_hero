@@ -23,7 +23,7 @@ _FENCED_RE = re.compile(
     re.MULTILINE | re.DOTALL,
 )
 _LINK_RE = re.compile(
-    r"(?<!\!)\[(?P<text>(?:[^\[\]]|\[[^\[\]]*\])+)\]\((?P<url>[^)\s]+)(?:\s+\"(?P<title>[^\"]*)\")?\)"
+    r"(?<!\!)\[(?P<text>(?:[^\[\]]|\[[^\[\]]*\])*)\]\((?P<url>[^)\s]*)(?:\s+\"(?P<title>[^\"]*)\")?\)"
 )
 _AUTOLINK_RE = re.compile(r"<(?P<url>https?://[^>\s]+)>")
 _IMAGE_RE = re.compile(

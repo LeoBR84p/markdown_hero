@@ -101,3 +101,33 @@ def test_non_mapping_frontmatter_raises():
 
 def test_empty_frontmatter_returns_empty_dict():
     assert extract_frontmatter("---\n---\n\nbody") == {}
+
+
+def test_extract_links_includes_autolinks():
+    md = "see <https://example.com> and [docs](https://x.com)"
+    links = extract_links(md)
+    types = {l.type for l in links}
+    assert "autolink" in types
+    assert "inline" in types
+    assert any(l.url == "https://example.com" for l in links)
+
+
+def test_extract_links_ignores_links_inside_code_blocks():
+    md = "real [doc](u)\n\n```\n[fake](http://x)\n```\n"
+    links = extract_links(md)
+    assert len(links) == 1
+    assert links[0].text == "doc"
+
+
+def test_extract_tables_with_right_and_default_alignment():
+    md = "| a | b | c |\n|---|---:|:---:|\n| 1 | 2 | 3 |\n"
+    tables = extract_tables(md)
+    assert tables[0].alignments == ["default", "right", "center"]
+
+
+def test_extract_code_blocks_filter_by_language():
+    md = "```python\nprint(1)\n```\n\n```rust\nfn main() {}\n```\n"
+    py = extract_code_blocks(md, language="python")
+    rs = extract_code_blocks(md, language="rust")
+    assert len(py) == 1 and "print" in py[0].code
+    assert len(rs) == 1 and "fn main" in rs[0].code

@@ -52,3 +52,20 @@ def test_word_format_with_overrides(tmp_path: Path):
     out = tmp_path / "out.docx"
     word_format(SAMPLE, out, style_overrides={"body_size": 12})
     assert out.exists()
+
+
+def test_word_format_with_template(tmp_path: Path):
+    template = tmp_path / "template.docx"
+    docx.Document().save(str(template))
+    out = tmp_path / "out.docx"
+    word_format(SAMPLE, out, template=template)
+    assert out.exists() and out.stat().st_size > 0
+
+
+def test_word_format_reads_from_path(tmp_path: Path):
+    src = tmp_path / "source.md"
+    src.write_text(SAMPLE, encoding="utf-8")
+    out = tmp_path / "out.docx"
+    word_format(src, out)
+    d = docx.Document(str(out))
+    assert any("Título" in p.text for p in d.paragraphs)

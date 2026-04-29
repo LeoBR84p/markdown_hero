@@ -50,3 +50,37 @@ def test_indices_are_assigned():
     md = "# A\n\nx\n\n# B\n\ny\n"
     chunks = extract_chunks(md)
     assert [c.index for c in chunks] == list(range(len(chunks)))
+
+
+def test_custom_tokenizer_is_used():
+    calls: list[str] = []
+
+    def fake_tokenizer(text: str) -> int:
+        calls.append(text)
+        return len(text.split())
+
+    md = "# A\n\none two three\n\n# B\n\nfour five six seven\n"
+    chunks = extract_chunks(md, tokenizer=fake_tokenizer, strategy="structural", max_tokens=100)
+    assert calls, "custom tokenizer was not invoked"
+    assert all(c.token_count > 0 for c in chunks)
+
+
+def test_purpose_summary_uses_large_budget():
+    body = "\n\n".join(f"paragraph {i} " * 20 for i in range(80))
+    md = f"# Doc\n\n{body}"
+    chunks = extract_chunks(md, purpose="summary")
+    assert len(chunks) == 1
+
+
+def test_purpose_finetune_no_overlap():
+    body = "\n\n".join(f"paragraph {i}" for i in range(200))
+    md = f"# Doc\n\n{body}"
+    chunks_finetune = extract_chunks(md, purpose="finetune", max_tokens=80)
+    chunks_rag = extract_chunks(md, purpose="rag", max_tokens=80)
+    # rag uses overlap, so for the same content it produces at least as many chunks
+    assert len(chunks_rag) >= len(chunks_finetune)
+
+
+def test_chunk_carries_source_field():
+    chunks = extract_chunks("# A\n\ntext", source="docs/a.md")
+    assert all(c.source == "docs/a.md" for c in chunks)
