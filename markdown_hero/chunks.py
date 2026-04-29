@@ -1,15 +1,22 @@
-"""Chunking estrutural para Markdown."""
+"""Structural chunking for Markdown documents.
+
+The public entry point is :func:`extract_chunks`. The output is a list
+of :class:`Chunk` objects with rich metadata that downstream consumers
+(RAG indexers, fine-tuning pipelines, summarizers) can use directly.
+"""
 from __future__ import annotations
 
 import re
 from dataclasses import replace
-from typing import Callable, Literal
+from typing import Any, Callable, Literal
 
-from .extract import extract_headings, remove_frontmatter
+from .extract import remove_frontmatter
 from .models import Chunk
 
 Purpose = Literal["rag", "finetune", "summary", "generic"]
 Strategy = Literal["structural", "semantic", "fixed", "hybrid"]
+ChunkType = Literal["prose", "code", "table", "list", "mixed"]
+Tokenizer = Callable[[str], int]
 
 _RE_FENCED = re.compile(r"^(```|~~~)[^\n]*\n.*?^\1\s*$", re.MULTILINE | re.DOTALL)
 _RE_HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$", re.MULTILINE)
@@ -68,6 +75,7 @@ def extract_chunks(
     max_tokens, overlap, default_strategy = _purpose_defaults(purpose, max_tokens, overlap)
     strategy = strategy or default_strategy
 
+    chunks: list[Chunk]
     if strategy == "fixed":
         chunks = _chunk_fixed(body, max_tokens, overlap, tok)
     elif strategy == "semantic":
@@ -112,7 +120,7 @@ def extract_chunks(
     return chunks
 
 
-def _classify(text: str) -> str:
+def _classify(text: str) -> ChunkType:
     if _RE_FENCED.search(text):
         return "code"
     stripped = text.strip()
@@ -123,13 +131,13 @@ def _classify(text: str) -> str:
     return "prose"
 
 
-def _split_sections(body: str) -> list[dict]:
-    """Divide o corpo em seções por heading, preservando o caminho hierárquico."""
+def _split_sections(body: str) -> list[dict[str, Any]]:
+    """Split the body into per-heading sections preserving the hierarchical path."""
     headings = list(_RE_HEADING.finditer(_mask_code(body)))
     if not headings:
         return [{"text": body, "path": [], "start": 0, "end": len(body)}]
 
-    sections: list[dict] = []
+    sections: list[dict[str, Any]] = []
     path: list[tuple[int, str]] = []  # (level, text)
     # Texto antes do primeiro heading.
     if headings[0].start() > 0:
@@ -165,7 +173,9 @@ def _mask_code(body: str) -> str:
     return "".join(out)
 
 
-def _subsplit_section(base: Chunk, max_tokens: int, overlap: int, tok) -> list[Chunk]:
+def _subsplit_section(
+    base: Chunk, max_tokens: int, overlap: int, tok: Tokenizer
+) -> list[Chunk]:
     """Sub-divide uma seção grande por parágrafo, respeitando blocos de código."""
     pieces = _split_preserving_blocks(base.text)
     chunks: list[Chunk] = []
@@ -219,7 +229,9 @@ def _subsplit_section(base: Chunk, max_tokens: int, overlap: int, tok) -> list[C
     return chunks
 
 
-def _make_overlap(buf: list[str], overlap_tokens: int, tok) -> tuple[list[str], int]:
+def _make_overlap(
+    buf: list[str], overlap_tokens: int, tok: Tokenizer
+) -> tuple[list[str], int]:
     """Mantém o final do buffer anterior como overlap."""
     keep: list[str] = []
     total = 0
@@ -246,7 +258,7 @@ def _split_preserving_blocks(text: str) -> list[str]:
     return parts
 
 
-def _chunk_fixed(body: str, max_tokens: int, overlap: int, tok) -> list[Chunk]:
+def _chunk_fixed(body: str, max_tokens: int, overlap: int, tok: Tokenizer) -> list[Chunk]:
     """Corte rígido por tokens (palavras, na ausência de tokenizer real)."""
     words = body.split()
     chunks: list[Chunk] = []
@@ -277,7 +289,7 @@ def _chunk_fixed(body: str, max_tokens: int, overlap: int, tok) -> list[Chunk]:
     return chunks
 
 
-def _chunk_semantic(body: str, max_tokens: int, overlap: int, tok) -> list[Chunk]:
+def _chunk_semantic(body: str, max_tokens: int, overlap: int, tok: Tokenizer) -> list[Chunk]:
     pieces = _split_preserving_blocks(body)
     chunks: list[Chunk] = []
     buf: list[str] = []

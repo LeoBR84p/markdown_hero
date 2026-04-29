@@ -1,8 +1,13 @@
-"""Transformações sobre Markdown."""
+"""Transformations that take Markdown in and return Markdown (or plain text).
+
+Functions here are pure: no IO, no mutation of input. Code blocks are
+preserved verbatim so technical content is never rewritten.
+"""
 from __future__ import annotations
 
 import re
 import unicodedata
+from typing import Callable
 
 _RE_FENCED = re.compile(r"^(```|~~~)[^\n]*\n.*?^\1\s*$", re.MULTILINE | re.DOTALL)
 _RE_INLINE_CODE = re.compile(r"`[^`\n]*`")
@@ -41,12 +46,12 @@ def shift_headings(md: str, by: int) -> str:
     return _apply_outside_code(md, _process)
 
 
-def _apply_outside_code(md: str, fn) -> str:
-    """Aplica ``fn`` apenas fora de blocos de código fenced."""
-    out = []
+def _apply_outside_code(md: str, fn: Callable[[str], str]) -> str:
+    """Apply ``fn`` to every region of ``md`` that is not inside a fenced code block."""
+    out: list[str] = []
     last = 0
     for m in _RE_FENCED.finditer(md):
-        out.append(fn(md[last:m.start()]))
+        out.append(fn(md[last : m.start()]))
         out.append(m.group(0))
         last = m.end()
     out.append(fn(md[last:]))

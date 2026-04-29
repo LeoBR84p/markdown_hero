@@ -1,10 +1,12 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from markdown_hero.cli import main
 
 
-def test_cli_strip(tmp_path: Path, capsys):
+def test_cli_strip(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     src = tmp_path / "in.md"
     src.write_text("**Olá**, mundo!", encoding="utf-8")
     rc = main(["strip", str(src)])
@@ -13,7 +15,7 @@ def test_cli_strip(tmp_path: Path, capsys):
     assert "ola mundo" in out
 
 
-def test_cli_chunk(tmp_path: Path, capsys):
+def test_cli_chunk(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     src = tmp_path / "in.md"
     src.write_text("# A\n\ntexto\n\n# B\n\noutro\n", encoding="utf-8")
     rc = main(["chunk", str(src), "--purpose", "rag"])
@@ -23,7 +25,7 @@ def test_cli_chunk(tmp_path: Path, capsys):
     assert isinstance(payload, list) and len(payload) >= 2
 
 
-def test_cli_append_and_break(tmp_path: Path, capsys):
+def test_cli_append_and_break(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     a = tmp_path / "a.md"
     b = tmp_path / "b.md"
     a.write_text("# A\n\ncontent a", encoding="utf-8")
@@ -37,7 +39,7 @@ def test_cli_append_and_break(tmp_path: Path, capsys):
     assert main(["break", str(out), "## B", "--output-dir", str(out_dir), "--include", "after"]) == 0
 
 
-def test_cli_lint_and_stats(tmp_path: Path, capsys):
+def test_cli_lint_and_stats(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     src = tmp_path / "in.md"
     src.write_text("# A\n\n### C\n\ntexto", encoding="utf-8")
     main(["lint", str(src)])

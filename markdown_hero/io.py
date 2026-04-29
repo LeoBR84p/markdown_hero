@@ -1,9 +1,13 @@
-"""Operações de IO sobre arquivos Markdown: append, break, merge."""
+"""File-level operations on Markdown documents: append, break, merge.
+
+Functions in this module read from disk, transform the content in
+memory, and write the result back. They never mutate the input files.
+"""
 from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Any, Iterable, Literal
 
 import yaml
 
@@ -27,7 +31,7 @@ def _write(path: str | Path, content: str) -> Path:
     return p
 
 
-def _dump_frontmatter(data: dict) -> str:
+def _dump_frontmatter(data: dict[str, Any]) -> str:
     if not data:
         return ""
     yml = yaml.safe_dump(data, sort_keys=False, allow_unicode=True).strip()
@@ -53,7 +57,7 @@ def markdown_append(
         raise ValueError("markdown_append: pelo menos um arquivo é necessário")
 
     bodies: list[str] = []
-    fms: list[dict] = []
+    fms: list[dict[str, Any]] = []
     for p in paths:
         raw = _read(p)
         body, fm = remove_frontmatter(raw)
@@ -73,7 +77,7 @@ def markdown_append(
 
     # Frontmatter.
     if frontmatter == "merge":
-        merged: dict = {}
+        merged: dict[str, Any] = {}
         conflicts: list[str] = []
         for fm in fms:
             for k, v in fm.items():
@@ -97,7 +101,7 @@ def markdown_append(
 
 def markdown_break(
     path: str | Path,
-    delimiter: str | re.Pattern | Iterable[str | re.Pattern],
+    delimiter: str | re.Pattern[str] | Iterable[str | re.Pattern[str]],
     *,
     include_delimiter: IncludeDelimiter = "none",
     output_dir: str | Path,
@@ -154,9 +158,9 @@ def markdown_break(
 
 
 def _build_delim_pattern(
-    delimiter: str | re.Pattern | Iterable[str | re.Pattern],
+    delimiter: str | re.Pattern[str] | Iterable[str | re.Pattern[str]],
     is_regex: bool,
-) -> re.Pattern:
+) -> re.Pattern[str]:
     if isinstance(delimiter, re.Pattern):
         return delimiter
     if isinstance(delimiter, str):
@@ -164,14 +168,12 @@ def _build_delim_pattern(
             delimiter if is_regex else re.escape(delimiter),
             re.MULTILINE,
         )
-    parts = []
+    parts: list[str] = []
     for d in delimiter:
         if isinstance(d, re.Pattern):
             parts.append(d.pattern)
-        elif isinstance(d, str):
-            parts.append(d if is_regex else re.escape(d))
         else:
-            raise TypeError(f"delimitador inválido: {type(d)!r}")
+            parts.append(d if is_regex else re.escape(d))
     return re.compile("|".join(parts), re.MULTILINE)
 
 

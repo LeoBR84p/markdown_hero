@@ -1,66 +1,74 @@
-"""markdown_hero — utilitários para processamento de Markdown."""
+"""markdown_hero — utilities for processing Markdown documents.
 
-from .strip import strip
-from .chunks import extract_chunks, Chunk
-from .io import markdown_append, markdown_break, markdown_merge
+Public API only. Implementation details (block parsers, regexes) live in
+private helpers and are not re-exported here.
+"""
+
+from .chunks import Chunk, extract_chunks
 from .docx import word_format
+from .errors import FrontmatterError, MarkdownHeroError, MarkdownStructureError
 from .extract import (
-    extract_frontmatter,
-    remove_frontmatter,
-    extract_links,
-    extract_images,
-    extract_tables,
-    extract_code_blocks,
-    extract_headings,
     build_toc,
+    extract_code_blocks,
+    extract_frontmatter,
+    extract_headings,
+    extract_images,
+    extract_links,
+    extract_tables,
+    remove_frontmatter,
 )
+from .io import markdown_append, markdown_break, markdown_merge
+from .lint import Issue, lint, reading_time, word_count
+from .models import CodeBlock, Heading, Image, Link, Table
+from .strip import strip
 from .transform import (
+    md_to_plain,
     normalize,
-    slugify,
     shift_headings,
+    slugify,
+    strip_code_blocks,
     strip_html,
     strip_images,
     strip_links,
-    strip_code_blocks,
-    md_to_plain,
 )
-from .lint import lint, word_count, reading_time, Issue
-from .models import Link, Image, Table, CodeBlock, Heading
 
 __version__ = "0.1.0"
 
 __all__ = [
-    "strip",
-    "extract_chunks",
     "Chunk",
+    "CodeBlock",
+    "FrontmatterError",
+    "Heading",
+    "Image",
+    "Issue",
+    "Link",
+    "MarkdownHeroError",
+    "MarkdownStructureError",
+    "Table",
+    "__version__",
+    "build_toc",
+    "extract_chunks",
+    "extract_code_blocks",
+    "extract_frontmatter",
+    "extract_headings",
+    "extract_images",
+    "extract_links",
+    "extract_tables",
+    "lint",
     "markdown_append",
     "markdown_break",
     "markdown_merge",
-    "word_format",
-    "extract_frontmatter",
-    "remove_frontmatter",
-    "extract_links",
-    "extract_images",
-    "extract_tables",
-    "extract_code_blocks",
-    "extract_headings",
-    "build_toc",
+    "md_to_plain",
     "normalize",
-    "slugify",
+    "reading_time",
+    "remove_frontmatter",
     "shift_headings",
+    "slugify",
+    "strip",
+    "strip_code_blocks",
     "strip_html",
     "strip_images",
     "strip_links",
-    "strip_code_blocks",
-    "md_to_plain",
-    "lint",
     "word_count",
-    "reading_time",
-    "Issue",
-    "Link",
-    "Image",
-    "Table",
-    "CodeBlock",
-    "Heading",
-    "__version__",
+    "word_format",
 ]

@@ -46,3 +46,41 @@ packages = ["markdown_hero"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.pyright]
+include = ["markdown_hero", "tests"]
+typeCheckingMode = "strict"
+pythonVersion = "3.10"
+# python-docx and yaml ship without type stubs; the resulting "Unknown"
+# diagnostics are noise from external libraries, not real type problems.
+# Equally, pyright's strict mode flags ``field(default_factory=list)`` as
+# unknown variable type even when the field itself has an explicit
+# ``list[str]`` annotation. We disable those reports globally and rely
+# on the test suite to catch real issues at those call sites.
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
+reportUnknownParameterType = "warning"
+reportUnknownLambdaType = "warning"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",   # pycodestyle / pyflakes
+  "I",             # isort
+  "B",             # bugbear
+  "UP",            # pyupgrade
+  "N",             # naming
+  "RUF",           # ruff-specific
+  "SIM",           # simplify
+]
+ignore = [
+  "E501",  # handled by ruff format
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011", "N802"]

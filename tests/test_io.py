@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 from markdown_hero import markdown_append, markdown_break, markdown_merge
 
 

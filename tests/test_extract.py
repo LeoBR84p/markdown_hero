@@ -1,4 +1,7 @@
+import pytest
+
 from markdown_hero import (
+    FrontmatterError,
     build_toc,
     extract_code_blocks,
     extract_frontmatter,
@@ -82,3 +85,19 @@ def test_build_toc():
     toc = build_toc(SAMPLE)
     assert "[Capítulo 1](#capitulo-1)" in toc
     assert "[Seção 1.1](#secao-11)" in toc
+
+
+def test_invalid_frontmatter_raises():
+    bad = "---\nkey: : invalid : :\n---\n\nbody"
+    with pytest.raises(FrontmatterError):
+        extract_frontmatter(bad)
+
+
+def test_non_mapping_frontmatter_raises():
+    bad = "---\n- a\n- b\n---\n\nbody"
+    with pytest.raises(FrontmatterError):
+        extract_frontmatter(bad)
+
+
+def test_empty_frontmatter_returns_empty_dict():
+    assert extract_frontmatter("---\n---\n\nbody") == {}

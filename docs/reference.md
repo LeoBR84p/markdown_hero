@@ -22,6 +22,7 @@ e exemplos de uso. A versão atual é **0.1.0**, Python ≥ 3.10, dialeto-alvo
 ---
 
 <a id="strip"></a>
+
 ## 1. `strip(text, *, keep_numbers=True, keep_math=False, keep_latex_text=False) -> str`
 
 Reduz Markdown a um único texto: minúsculas, sem acentos (NFKD), sem
@@ -68,6 +69,7 @@ strip("A formula $x = y + 1$.", keep_latex_text=True)
 ---
 
 <a id="extract_chunks"></a>
+
 ## 2. `extract_chunks(md, *, strategy=None, purpose="generic", max_tokens=0, overlap=0, tokenizer=None, source=None, min_tokens=0) -> list[Chunk]`
 
 Divide um documento em pedaços com metadados estruturais úteis para RAG,
@@ -134,6 +136,7 @@ for c in chunks:
 ---
 
 <a id="word_format"></a>
+
 ## 3. `word_format(md, output_path, *, template=None, style_overrides=None) -> Path`
 
 Renderiza Markdown em `.docx` com um conjunto de estilos profissionais.
@@ -200,6 +203,7 @@ word_format(
 ---
 
 <a id="markdown_append"></a>
+
 ## 4. `markdown_append(*paths, output, separator="\n\n", frontmatter="merge", headings="shift") -> Path`
 
 Concatena vários arquivos Markdown em um único arquivo de saída.
@@ -237,6 +241,7 @@ markdown_append(
 ---
 
 <a id="markdown_break"></a>
+
 ## 5. `markdown_break(path, delimiter, *, include_delimiter="none", output_dir, name_pattern="{stem}_{i:03d}.md", frontmatter="replicate", is_regex=False) -> list[Path]`
 
 Quebra um arquivo Markdown em **N+1** partes nos pontos onde o delimitador
@@ -281,6 +286,7 @@ markdown_break("doc.md", ["===", "---END---"], output_dir="parts/")
 ---
 
 <a id="markdown_merge"></a>
+
 ## 6. `markdown_merge(*paths, output, dedupe_headings=True, rebuild_toc=False, separator="\n\n") -> Path`
 
 Append “inteligente”: usa `markdown_append` com merge de frontmatter e shift
@@ -298,6 +304,7 @@ markdown_merge("a.md", "b.md", output="merged.md", rebuild_toc=True)
 ---
 
 <a id="extracao"></a>
+
 ## 7. Funções de extração
 
 | Função | Retorno |
@@ -325,6 +332,7 @@ print(build_toc(open("doc.md").read(), max_depth=2))
 ---
 
 <a id="transformacao"></a>
+
 ## 8. Funções de transformação
 
 | Função | Descrição |
@@ -341,6 +349,7 @@ print(build_toc(open("doc.md").read(), max_depth=2))
 ---
 
 <a id="lint"></a>
+
 ## 9. Lint e métricas
 
 ### `lint(md) -> list[Issue]`
@@ -372,6 +381,7 @@ Tempo de leitura em minutos (200 WPM ≈ leitor médio em prosa).
 ---
 
 <a id="cli"></a>
+
 ## 10. CLI — `markdown-hero`
 
 ```text
@@ -403,6 +413,7 @@ markdown-hero break livro.md "## " --regex --include after --output-dir secoes/
 ---
 
 <a id="modelos"></a>
+
 ## 11. Modelos de dados
 
 ```python
@@ -437,6 +448,7 @@ class Chunk:
 ---
 
 <a id="design"></a>
+
 ## 12. Decisões de design
 
 - **Dialeto-alvo**: GFM. Cobre 95% dos casos reais (GitHub, Obsidian, Notion

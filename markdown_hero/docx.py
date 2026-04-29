@@ -1,9 +1,14 @@
-"""Renderização de Markdown para Word (.docx) com estilos pré-definidos."""
+"""Render Markdown to Word (.docx) using a fixed set of styles.
+
+Public surface is :func:`word_format`. Helpers in this module operate on
+plain dictionaries produced by an internal block parser; they are not
+intended for external use.
+"""
 from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from docx import Document
 from docx.enum.table import WD_ALIGN_VERTICAL
@@ -12,10 +17,12 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor
 
+from .errors import MarkdownStructureError
 from .extract import remove_frontmatter
 
-# Conjunto fixo de estilos.
-DEFAULT_STYLES: dict[str, dict[str, Any]] = {
+# Fixed style set used to render Markdown to .docx. ``style_overrides``
+# argument of :func:`word_format` shallow-merges over this dictionary.
+DEFAULT_STYLES: dict[str, Any] = {
     "body_font": "Calibri",
     "code_font": "Consolas",
     "body_size": 11,
@@ -65,9 +72,11 @@ def word_format(
 
 
 def _read_md(md: str | Path) -> str:
-    if isinstance(md, Path) or (isinstance(md, str) and "\n" not in md and Path(md).exists()):
+    if isinstance(md, Path):
+        return md.read_text(encoding="utf-8")
+    if "\n" not in md and Path(md).exists():
         return Path(md).read_text(encoding="utf-8")
-    return str(md)
+    return md
 
 
 # --- Parsing em blocos -------------------------------------------------------
@@ -82,12 +91,10 @@ _TABLE_SEP_RE = re.compile(r"^\s*\|?\s*:?-{3,}:?(?:\s*\|\s*:?-{3,}:?)*\s*\|?\s*$
 _CAPTION_RE = re.compile(r"^Table:\s*(.+)$", re.IGNORECASE)
 
 
-def _parse_blocks(body: str) -> list[dict]:
-    """Tokeniza o Markdown em blocos de alto nível."""
-    blocks: list[dict] = []
-    # Primeiro extrai blocos fenced para preservá-los.
-    last = 0
-    fenced_segments: list[tuple[int, int, dict]] = []
+def _parse_blocks(body: str) -> list[dict[str, Any]]:
+    """Tokenize Markdown into a flat list of typed block dictionaries."""
+    blocks: list[dict[str, Any]] = []
+    fenced_segments: list[tuple[int, int, dict[str, Any]]] = []
     for m in _FENCED_RE.finditer(body):
         fenced_segments.append((m.start(), m.end(), {
             "kind": "code",
@@ -106,9 +113,9 @@ def _parse_blocks(body: str) -> list[dict]:
     return blocks
 
 
-def _parse_non_code(text: str) -> list[dict]:
+def _parse_non_code(text: str) -> list[dict[str, Any]]:
     lines = text.split("\n")
-    blocks: list[dict] = []
+    blocks: list[dict[str, Any]] = []
     i = 0
     n = len(lines)
     pending_caption: str | None = None
@@ -166,7 +173,7 @@ def _parse_non_code(text: str) -> list[dict]:
             continue
         # Lista (UL ou OL).
         if _UL_RE.match(line) or _OL_RE.match(line):
-            items: list[dict] = []
+            items: list[dict[str, Any]] = []
             while i < n and lines[i].strip() and (_UL_RE.match(lines[i]) or _OL_RE.match(lines[i])):
                 ul = _UL_RE.match(lines[i])
                 ol = _OL_RE.match(lines[i])
@@ -217,7 +224,7 @@ def _split_row(line: str) -> list[str]:
 
 
 def _parse_align(sep: str) -> list[str]:
-    out = []
+    out: list[str] = []
     for part in _split_row(sep):
         left = part.startswith(":")
         right = part.endswith(":")
@@ -244,58 +251,75 @@ _INLINE_RE = re.compile(
 )
 
 
-def _render_block(doc, block: dict, styles: dict) -> None:
-    kind = block["kind"]
-    if kind == "heading":
-        p = doc.add_heading(level=min(block["level"], 9))
-        p.text = ""
-        _render_inline(p, block["text"], styles)
-        return
-    if kind == "paragraph":
-        p = doc.add_paragraph(style="Normal")
-        _render_inline(p, block["text"], styles)
-        return
-    if kind == "quote":
+def _render_heading(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> None:
+    p = doc.add_heading(level=min(block["level"], 9))
+    p.text = ""
+    _render_inline(p, block["text"], styles)
+
+
+def _render_paragraph(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> None:
+    p = doc.add_paragraph(style="Normal")
+    _render_inline(p, block["text"], styles)
+
+
+def _render_quote(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> None:
+    try:
+        p = doc.add_paragraph(style="Quote")
+    except KeyError:
+        p = doc.add_paragraph()
+        p.paragraph_format.left_indent = Pt(18)
+    _render_inline(p, block["text"], styles)
+    for run in p.runs:
+        run.italic = True
+
+
+def _render_list(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> None:
+    for item in block["items"]:
+        style_name = "List Number" if item["ordered"] else "List Bullet"
         try:
-            p = doc.add_paragraph(style="Quote")
+            p = doc.add_paragraph(style=style_name)
         except KeyError:
             p = doc.add_paragraph()
-            p.paragraph_format.left_indent = Pt(18)
-        _render_inline(p, block["text"], styles)
-        for run in p.runs:
-            run.italic = True
-        return
-    if kind == "list":
-        for item in block["items"]:
-            style_name = "List Number" if item["ordered"] else "List Bullet"
-            try:
-                p = doc.add_paragraph(style=style_name)
-            except KeyError:
-                p = doc.add_paragraph()
-            _render_inline(p, item["text"], styles)
-        return
-    if kind == "code":
-        _render_code(doc, block["code"], styles)
-        return
-    if kind == "hr":
-        p = doc.add_paragraph()
-        pPr = p._p.get_or_add_pPr()
-        pBdr = OxmlElement("w:pBdr")
-        bottom = OxmlElement("w:bottom")
-        bottom.set(qn("w:val"), "single")
-        bottom.set(qn("w:sz"), "6")
-        bottom.set(qn("w:space"), "1")
-        bottom.set(qn("w:color"), "auto")
-        pBdr.append(bottom)
-        pPr.append(pBdr)
-        return
-    if kind == "table":
-        _render_table(doc, block, styles)
-        return
+        _render_inline(p, item["text"], styles)
 
 
-def _render_inline(paragraph, text: str, styles: dict) -> None:
-    """Aplica formatação inline (bold, italic, code, link) ao parágrafo."""
+def _render_code_block(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> None:
+    _render_code(doc, block["code"], styles)
+
+
+def _render_hr(doc: Any, _block: dict[str, Any], _styles: dict[str, Any]) -> None:
+    p = doc.add_paragraph()
+    p_pr = p._p.get_or_add_pPr()
+    p_bdr = OxmlElement("w:pBdr")
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), "6")
+    bottom.set(qn("w:space"), "1")
+    bottom.set(qn("w:color"), "auto")
+    p_bdr.append(bottom)
+    p_pr.append(p_bdr)
+
+
+_BLOCK_RENDERERS: dict[str, Callable[[Any, dict[str, Any], dict[str, Any]], None]] = {
+    "heading": _render_heading,
+    "paragraph": _render_paragraph,
+    "quote": _render_quote,
+    "list": _render_list,
+    "code": _render_code_block,
+    "hr": _render_hr,
+    "table": lambda doc, block, styles: _render_table(doc, block, styles),
+}
+
+
+def _render_block(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> None:
+    renderer = _BLOCK_RENDERERS.get(block["kind"])
+    if renderer is None:
+        raise MarkdownStructureError(f"unknown block kind: {block['kind']!r}")
+    renderer(doc, block, styles)
+
+
+def _render_inline(paragraph: Any, text: str, styles: dict[str, Any]) -> None:
+    """Apply inline formatting (bold, italic, code, link) to a Word paragraph."""
     pos = 0
     for m in _INLINE_RE.finditer(text):
         if m.start() > pos:
@@ -330,7 +354,7 @@ def _render_inline(paragraph, text: str, styles: dict) -> None:
         paragraph.add_run(text[pos:])
 
 
-def _render_code(doc, code: str, styles: dict) -> None:
+def _render_code(doc: Any, code: str, styles: dict[str, Any]) -> None:
     try:
         p = doc.add_paragraph(style="Code Block")
     except KeyError:
@@ -344,7 +368,7 @@ def _render_code(doc, code: str, styles: dict) -> None:
     _shade_paragraph(p, styles["code_bg"])
 
 
-def _render_table(doc, block: dict, styles: dict) -> None:
+def _render_table(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> None:
     if block.get("caption") and styles["table_caption_centered"]:
         cap = doc.add_paragraph(block["caption"])
         cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -393,7 +417,7 @@ def _render_table(doc, block: dict, styles: dict) -> None:
             _set_cell_align(p, align)
 
 
-def _set_cell_align(paragraph, align: str) -> None:
+def _set_cell_align(paragraph: Any, align: str) -> None:
     if align == "center":
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
     elif align == "right":
@@ -402,35 +426,35 @@ def _set_cell_align(paragraph, align: str) -> None:
         paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
 
-def _shade_cell(cell, hex_color: str) -> None:
-    tcPr = cell._tc.get_or_add_tcPr()
+def _shade_cell(cell: Any, hex_color: str) -> None:
+    tc_pr = cell._tc.get_or_add_tcPr()
     shd = OxmlElement("w:shd")
     shd.set(qn("w:fill"), hex_color)
-    tcPr.append(shd)
+    tc_pr.append(shd)
 
 
-def _shade_paragraph(paragraph, hex_color: str) -> None:
-    pPr = paragraph._p.get_or_add_pPr()
+def _shade_paragraph(paragraph: Any, hex_color: str) -> None:
+    p_pr = paragraph._p.get_or_add_pPr()
     shd = OxmlElement("w:shd")
     shd.set(qn("w:fill"), hex_color)
-    pPr.append(shd)
+    p_pr.append(shd)
 
 
-def _shade_run(run, hex_color: str) -> None:
-    rPr = run._r.get_or_add_rPr()
+def _shade_run(run: Any, hex_color: str) -> None:
+    r_pr = run._r.get_or_add_rPr()
     shd = OxmlElement("w:shd")
     shd.set(qn("w:fill"), hex_color)
-    rPr.append(shd)
+    r_pr.append(shd)
 
 
-def _repeat_table_header(row) -> None:
-    trPr = row._tr.get_or_add_trPr()
-    tblHeader = OxmlElement("w:tblHeader")
-    tblHeader.set(qn("w:val"), "true")
-    trPr.append(tblHeader)
+def _repeat_table_header(row: Any) -> None:
+    tr_pr = row._tr.get_or_add_trPr()
+    tbl_header = OxmlElement("w:tblHeader")
+    tbl_header.set(qn("w:val"), "true")
+    tr_pr.append(tbl_header)
 
 
-def _add_hyperlink(paragraph, url: str, text: str, color: str) -> None:
+def _add_hyperlink(paragraph: Any, url: str, text: str, color: str) -> None:
     part = paragraph.part
     r_id = part.relate_to(
         url,
@@ -440,14 +464,14 @@ def _add_hyperlink(paragraph, url: str, text: str, color: str) -> None:
     hyperlink = OxmlElement("w:hyperlink")
     hyperlink.set(qn("r:id"), r_id)
     new_run = OxmlElement("w:r")
-    rPr = OxmlElement("w:rPr")
+    r_pr = OxmlElement("w:rPr")
     color_el = OxmlElement("w:color")
     color_el.set(qn("w:val"), color)
-    rPr.append(color_el)
+    r_pr.append(color_el)
     underline = OxmlElement("w:u")
     underline.set(qn("w:val"), "single")
-    rPr.append(underline)
-    new_run.append(rPr)
+    r_pr.append(underline)
+    new_run.append(r_pr)
     t = OxmlElement("w:t")
     t.text = text
     t.set(qn("xml:space"), "preserve")
@@ -458,7 +482,7 @@ def _add_hyperlink(paragraph, url: str, text: str, color: str) -> None:
 
 # --- Estilos customizados ----------------------------------------------------
 
-def _ensure_custom_styles(doc, styles: dict) -> None:
+def _ensure_custom_styles(doc: Any, styles: dict[str, Any]) -> None:
     from docx.enum.style import WD_STYLE_TYPE
 
     style_collection = doc.styles

@@ -1,8 +1,12 @@
-"""Tipos de dados públicos."""
+"""Public dataclasses returned by markdown_hero functions.
+
+Only data containers live here. Logic and parsing belong to the modules
+that produce these structures.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 
 @dataclass
@@ -57,4 +61,4 @@ class Chunk:
     source: str | None = None
     index: int = 0
     oversized: bool = False
-    metadata: dict = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)

@@ -1,11 +1,18 @@
-"""Funções de extração estrutural a partir de Markdown."""
+"""Structural extraction from Markdown content.
+
+Public functions in this module never mutate their input. They return
+plain dataclasses defined in :mod:`markdown_hero.models`. They do *not*
+provide rendering or transformation — see :mod:`markdown_hero.transform`
+for that.
+"""
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
+from .errors import FrontmatterError
 from .models import CodeBlock, Heading, Image, Link, Table
 
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
@@ -36,17 +43,41 @@ def _slugify_anchor(text: str) -> str:
 
 
 def extract_frontmatter(md: str) -> dict[str, Any]:
-    """Devolve o dicionário do YAML frontmatter (ou {} se ausente)."""
+    """Parse the YAML frontmatter at the top of a Markdown document.
+
+    A frontmatter block must start at the very first line of ``md`` and
+    is delimited by ``---`` lines. When no frontmatter is found, an empty
+    dictionary is returned. When a frontmatter block is present but
+    cannot be parsed as a YAML mapping, ``FrontmatterError`` is raised
+    so that the caller can react explicitly instead of silently losing
+    metadata.
+
+    Args:
+        md: Full Markdown content as text.
+
+    Returns:
+        A dictionary with the parsed frontmatter, or ``{}`` when no
+        frontmatter block is present.
+
+    Raises:
+        FrontmatterError: When the YAML inside the delimiters is invalid
+            or does not parse to a mapping.
+    """
     m = _FRONTMATTER_RE.match(md)
     if not m:
         return {}
     try:
-        data = yaml.safe_load(m.group(1)) or {}
-    except yaml.YAMLError:
+        data: Any = yaml.safe_load(m.group(1))
+    except yaml.YAMLError as exc:
+        raise FrontmatterError(f"invalid YAML in frontmatter: {exc}") from exc
+    if data is None:
         return {}
     if not isinstance(data, dict):
-        return {}
-    return data
+        raise FrontmatterError(
+            f"frontmatter must be a YAML mapping, got {type(data).__name__}"
+        )
+    # yaml.safe_load returns Any; the runtime check above narrows to dict.
+    return cast("dict[str, Any]", data)
 
 
 def remove_frontmatter(md: str) -> tuple[str, dict[str, Any]]:
@@ -175,7 +206,7 @@ def _split_row(line: str) -> list[str]:
 
 
 def _parse_align(sep: str) -> list[str]:
-    out = []
+    out: list[str] = []
     for part in _split_row(sep):
         left = part.startswith(":")
         right = part.endswith(":")
