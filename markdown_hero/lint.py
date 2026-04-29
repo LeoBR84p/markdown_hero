@@ -16,7 +16,7 @@ from .transform import md_to_plain
 Severity = Literal["info", "warning", "error"]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Issue:
     """A single lint diagnostic.
 
@@ -61,38 +61,37 @@ def lint(md: str) -> list[Issue]:
         if prev and h.level > prev + 1:
             issues.append(Issue(
                 rule="heading-skip",
-                message=f"heading nível H{h.level} após H{prev} (pulou níveis)",
+                message=f"heading H{h.level} follows H{prev} (skipped one or more levels)",
                 line=h.line,
                 severity="warning",
             ))
         prev = h.level
 
-    # Anchors duplicados.
     anchors: dict[str, int] = {}
     for h in headings:
         if h.anchor in anchors:
             issues.append(Issue(
                 rule="duplicate-anchor",
-                message=f"âncora duplicada '{h.anchor}' (também em linha {anchors[h.anchor]})",
+                message=f"duplicate anchor '{h.anchor}' (also at line {anchors[h.anchor]})",
                 line=h.line,
                 severity="warning",
             ))
         else:
             anchors[h.anchor] = h.line
 
-    # Links com texto vazio ou URL faltante.
     for link in extract_links(md):
         if not link.text.strip():
-            issues.append(Issue("empty-link-text", "link com texto vazio", link.line, "warning"))
+            issues.append(Issue("empty-link-text", "link with empty text", link.line, "warning"))
         if not link.url.strip() or link.url.strip() == "#":
-            issues.append(Issue("empty-link-url", "link com URL vazia ou apenas '#'", link.line, "warning"))
+            issues.append(
+                Issue("empty-link-url", "link with empty URL or only '#'", link.line, "warning")
+            )
 
-    # Blocos fenced não fechados.
     fences = re.findall(r"^(?:```|~~~)", md, re.MULTILINE)
     if len(fences) % 2 != 0:
         last = list(re.finditer(r"^(?:```|~~~)", md, re.MULTILINE))[-1]
         line = md.count("\n", 0, last.start()) + 1
-        issues.append(Issue("unclosed-fence", "bloco de código não fechado", line, "error"))
+        issues.append(Issue("unclosed-fence", "fenced code block not closed", line, "error"))
 
     return issues
 

@@ -311,7 +311,7 @@ def _parse_align(sep: str) -> list[str]:
     return out
 
 
-# --- Renderização ------------------------------------------------------------
+# --- Rendering ---------------------------------------------------------------
 
 _INLINE_RE = re.compile(
     r"(?P<code>`[^`\n]+`)"
@@ -335,6 +335,8 @@ def _render_paragraph(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -
 
 
 def _render_quote(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> None:
+    # Fallback: when a custom template lacks the "Quote" style, fall back to
+    # a plain paragraph with manual indentation so rendering never aborts.
     try:
         p = doc.add_paragraph(style="Quote")
     except KeyError:
@@ -348,6 +350,8 @@ def _render_quote(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> No
 def _render_list(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> None:
     for item in block["items"]:
         style_name = "List Number" if item["ordered"] else "List Bullet"
+        # Fallback: stripped-down templates may not ship the "List Bullet" /
+        # "List Number" styles; degrade to a normal paragraph instead of failing.
         try:
             p = doc.add_paragraph(style=style_name)
         except KeyError:
@@ -427,6 +431,8 @@ def _render_inline(paragraph: Any, text: str, styles: dict[str, Any]) -> None:
 
 
 def _render_code(doc: Any, code: str, styles: dict[str, Any]) -> None:
+    # Fallback: _ensure_custom_styles tries to create "Code Block" up front,
+    # but a hostile template can still suppress it; render without style if so.
     try:
         p = doc.add_paragraph(style="Code Block")
     except KeyError:
@@ -449,6 +455,8 @@ def _render_table(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> No
     rows = block["rows"]
     aligns = block.get("alignments") or ["default"] * len(headers)
     table = doc.add_table(rows=1 + len(rows), cols=len(headers))
+    # Fallback: minimal templates may not register "Table Grid"; in that
+    # case the table still renders, just without the default border style.
     try:
         table.style = "Table Grid"
     except KeyError:
@@ -581,7 +589,7 @@ def _ensure_custom_styles(doc: Any, styles: dict[str, Any]) -> None:
         s.font.name = styles["code_font"]
         s.font.size = Pt(styles["code_size"])
 
-    # Ajustes de fonte default (apenas se 'Normal' não foi imposta por template).
+    # Adjust the default body font only when no template has imposed its own "Normal" style.
     normal = style_collection["Normal"]
     if normal.font.name in (None, "Calibri"):
         normal.font.name = styles["body_font"]
@@ -589,6 +597,9 @@ def _ensure_custom_styles(doc: Any, styles: dict[str, Any]) -> None:
 
     # Tamanhos de heading.
     for lvl, size in styles["heading_sizes"].items():
+        # Fallback: a template may omit some of "Heading 1".."Heading 6";
+        # we skip silently because the renderer never targets a missing
+        # heading style directly (Document.add_heading auto-creates it).
         try:
             h = style_collection[f"Heading {lvl}"]
             h.font.size = Pt(size)

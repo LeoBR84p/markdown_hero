@@ -73,14 +73,9 @@ def strip(
         return ""
 
     s = text
-
-    # 1. Blocos de código.
     s = _RE_FENCED.sub(" ", s)
-
-    # 2. Inline code.
     s = _RE_INLINE_CODE.sub(" ", s)
 
-    # 3. Math.
     if keep_latex_text:
         s = _RE_MATH_BLOCK.sub(lambda m: " " + m.group(0).strip("$") + " ", s)
         s = _RE_MATH_INLINE.sub(lambda m: " " + m.group(0).strip("$") + " ", s)
@@ -88,58 +83,43 @@ def strip(
         s = _RE_MATH_BLOCK.sub(" ", s)
         s = _RE_MATH_INLINE.sub(" ", s)
 
-    # 4. HTML.
     s = _RE_HTML.sub(" ", s)
-
-    # 5. Imagens (mantém alt) e links (mantém texto).
     s = _RE_IMAGE.sub(r"\1", s)
     s = _RE_LINK.sub(r"\1", s)
     s = _RE_REF_LINK.sub(r"\1", s)
     s = _RE_REF_DEF.sub(" ", s)
-
-    # 6. Marcadores de bloco.
     s = _RE_HR.sub(" ", s)
     s = _RE_HEADING.sub("", s)
     s = _RE_BLOCKQUOTE.sub("", s)
     s = _RE_LIST.sub("", s)
-
-    # 7. Tabelas: remove a linha separadora e reduz pipes a espaço.
     s = _RE_TABLE_SEP.sub(" ", s)
     s = _RE_TABLE_PIPES.sub(" ", s)
-
-    # 8. Marcadores de ênfase.
     s = _RE_EMPHASIS.sub("", s)
 
-    # 9. Normalização Unicode (remove diacríticos: ç→c, ã→a, é→e, etc).
     s = unicodedata.normalize("NFKD", s)
     s = "".join(ch for ch in s if not unicodedata.combining(ch))
 
-    # 10. Tratamento de pontuação e símbolos.
     out_chars: list[str] = []
     for ch in s:
-        cat = unicodedata.category(ch)  # ex: 'Lu', 'Nd', 'Po', 'Zs', 'Cc'
+        cat = unicodedata.category(ch)
         if cat.startswith("L") or cat.startswith("N") or ch in (" ", "\t", "\n"):
             out_chars.append(ch)
         elif keep_math and ch in _MATH_SYMBOLS_SET:
             out_chars.append(ch)
         elif ch in _MATH_SYMBOLS_SET and not keep_math:
-            # Symbols matemáticos sem keep_math: deletados (juntam tokens vizinhos).
+            # Math symbols without keep_math are deleted with no replacement,
+            # joining adjacent tokens (e.g. "p=2" -> "p2"). This is the design
+            # contract documented on the function.
             continue
         else:
-            # Demais sinais (.,;:!?()[]{}…): viram espaço.
             out_chars.append(" ")
     s = "".join(out_chars)
 
-    # 11. Remove qualquer caractere não-ASCII residual (símbolos exóticos).
     s = re.sub(r"[^\x00-\x7f]", " ", s)
-
-    # 12. Lowercase.
     s = s.lower()
 
-    # 13. Números.
     if not keep_numbers:
         s = re.sub(r"\d+", " ", s)
 
-    # 14. Colapsa espaços e quebras.
     s = re.sub(r"\s+", " ", s).strip()
     return s

@@ -23,19 +23,19 @@ _RE_HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$", re.MULTILINE)
 
 
 def _default_tokenizer() -> Callable[[str], int]:
-    """Tokenizer padrão: tiktoken se instalado, caso contrário aproximação."""
+    """Default tokenizer: tiktoken cl100k_base when installed, an approximation otherwise."""
     try:
         import tiktoken  # type: ignore
 
         enc = tiktoken.get_encoding("cl100k_base")
         return lambda s: len(enc.encode(s))
     except Exception:
-        # ~4 chars/token em inglês, ~3 em português; usamos 3.5 como média.
+        # Approximation: ~4 chars/token in English, ~3 in Portuguese; we use 3.5 as average.
         return lambda s: max(1, int(len(s) / 3.5))
 
 
 def _purpose_defaults(purpose: Purpose, max_tokens: int, overlap: int) -> tuple[int, int, Strategy]:
-    """Ajusta defaults conforme o propósito."""
+    """Apply per-purpose defaults to ``max_tokens``, ``overlap``, and strategy."""
     if purpose == "rag":
         return max_tokens or 512, overlap or 64, "hybrid"
     if purpose == "finetune":
@@ -192,8 +192,7 @@ def _split_sections(body: str) -> list[dict[str, Any]]:
         return [{"text": body, "path": [], "start": 0, "end": len(body)}]
 
     sections: list[dict[str, Any]] = []
-    path: list[tuple[int, str]] = []  # (level, text)
-    # Texto antes do primeiro heading.
+    path: list[tuple[int, str]] = []
     if headings[0].start() > 0:
         intro = body[: headings[0].start()].strip()
         if intro:
@@ -216,7 +215,7 @@ def _split_sections(body: str) -> list[dict[str, Any]]:
 
 
 def _mask_code(body: str) -> str:
-    """Substitui blocos de código por linhas em branco preservando offsets."""
+    """Replace fenced code blocks with blank lines while preserving character offsets."""
     out = []
     last = 0
     for m in _RE_FENCED.finditer(body):
@@ -230,7 +229,7 @@ def _mask_code(body: str) -> str:
 def _subsplit_section(
     base: Chunk, max_tokens: int, overlap: int, tok: Tokenizer
 ) -> list[Chunk]:
-    """Sub-divide uma seção grande por parágrafo, respeitando blocos de código."""
+    """Subdivide an oversized section by paragraph, keeping code blocks intact."""
     pieces = _split_preserving_blocks(base.text)
     chunks: list[Chunk] = []
     buf: list[str] = []
@@ -254,7 +253,7 @@ def _subsplit_section(
             else:
                 buf, buf_tokens = [], 0
         if ptok > max_tokens:
-            # bloco isolado maior que o máximo: vira chunk único oversized.
+            # An isolated block larger than max_tokens becomes a single oversized chunk.
             if buf:
                 text = "\n\n".join(buf).strip()
                 chunks.append(replace(
@@ -286,7 +285,7 @@ def _subsplit_section(
 def _make_overlap(
     buf: list[str], overlap_tokens: int, tok: Tokenizer
 ) -> tuple[list[str], int]:
-    """Mantém o final do buffer anterior como overlap."""
+    """Return the tail of the previous buffer to use as overlap for the next chunk."""
     keep: list[str] = []
     total = 0
     for piece in reversed(buf):
@@ -299,7 +298,7 @@ def _make_overlap(
 
 
 def _split_preserving_blocks(text: str) -> list[str]:
-    """Split por parágrafo preservando blocos fenced e tabelas."""
+    """Split a region by paragraph while preserving fenced code blocks and tables."""
     parts: list[str] = []
     last = 0
     for m in _RE_FENCED.finditer(text):
@@ -313,7 +312,7 @@ def _split_preserving_blocks(text: str) -> list[str]:
 
 
 def _chunk_fixed(body: str, max_tokens: int, overlap: int, tok: Tokenizer) -> list[Chunk]:
-    """Corte rígido por tokens (palavras, na ausência de tokenizer real)."""
+    """Hard token-based slicing (uses words as a proxy when no tokenizer is provided)."""
     words = body.split()
     chunks: list[Chunk] = []
     i = 0

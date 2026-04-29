@@ -83,7 +83,6 @@ def markdown_append(
         bodies.append(body)
         fms.append(fm)
 
-    # Ajuste de headings.
     if headings == "shift":
         if bodies and _has_h1(bodies[0]):
             for i in range(1, len(bodies)):
@@ -94,7 +93,6 @@ def markdown_append(
             title = fms[i].get("title") or Path(p).stem
             bodies[i] = f"# {title}\n\n" + shift_headings(bodies[i], by=1)
 
-    # Frontmatter.
     if frontmatter == "merge":
         merged: dict[str, Any] = {}
         conflicts: list[str] = []
@@ -111,7 +109,7 @@ def markdown_append(
         head = _dump_frontmatter(fms[0])
     elif frontmatter == "all":
         head = "".join(_dump_frontmatter(fm) for fm in fms if fm)
-    else:  # drop
+    else:
         head = ""
 
     body_joined = separator.join(b.strip() for b in bodies if b.strip())
@@ -272,7 +270,7 @@ def markdown_merge(
 
 
 def _dedupe_consecutive_sections(body: str) -> str:
-    """Remove duplicatas consecutivas de heading idêntico (mesmo nível e texto)."""
+    """Drop sections whose heading repeats the previous heading verbatim (same level and text)."""
     pattern = re.compile(r"(^\s{0,3}#{1,6}\s+.+?$)", re.MULTILINE)
     matches = list(pattern.finditer(body))
     if not matches:

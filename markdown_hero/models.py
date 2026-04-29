@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 
-@dataclass
+@dataclass(frozen=True)
 class Link:
     """An inline, reference, or autolink reference found in Markdown."""
 
@@ -20,7 +20,7 @@ class Link:
     type: Literal["inline", "reference", "autolink"] = "inline"
 
 
-@dataclass
+@dataclass(frozen=True)
 class Image:
     """An inline image reference found in Markdown."""
 
@@ -30,7 +30,7 @@ class Image:
     line: int = 0
 
 
-@dataclass
+@dataclass(frozen=True)
 class Table:
     """A GFM-style table, ready for rendering or row-by-row processing."""
 
@@ -40,7 +40,7 @@ class Table:
     alignments: list[Literal["left", "center", "right", "default"]] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(frozen=True)
 class CodeBlock:
     """A fenced code block with its info-string language tag."""
 
@@ -50,7 +50,7 @@ class CodeBlock:
     fenced: bool = True
 
 
-@dataclass
+@dataclass(frozen=True)
 class Heading:
     """An ATX heading with the slugified anchor used for linking."""
 

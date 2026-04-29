@@ -14,6 +14,7 @@ import yaml
 
 from .errors import FrontmatterError
 from .models import CodeBlock, Heading, Image, Link, Table
+from .transform import slugify
 
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 _HEADING_RE = re.compile(r"^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$", re.MULTILINE)
@@ -28,18 +29,6 @@ _AUTOLINK_RE = re.compile(r"<(?P<url>https?://[^>\s]+)>")
 _IMAGE_RE = re.compile(
     r"!\[(?P<alt>[^\]]*)\]\((?P<url>[^)\s]+)(?:\s+\"(?P<title>[^\"]*)\")?\)"
 )
-
-
-def _slugify_anchor(text: str) -> str:
-    """Slug compatível com GitHub: minúsculas, espaços→'-', remove pontuação."""
-    import unicodedata
-
-    s = unicodedata.normalize("NFKD", text)
-    s = "".join(c for c in s if not unicodedata.combining(c))
-    s = s.lower()
-    s = re.sub(r"[^\w\s-]", "", s)
-    s = re.sub(r"\s+", "-", s).strip("-")
-    return s
 
 
 def extract_frontmatter(md: str) -> dict[str, Any]:
@@ -103,12 +92,12 @@ def remove_frontmatter(md: str) -> tuple[str, dict[str, Any]]:
 
 
 def _strip_for_scan(md: str) -> str:
-    """Substitui blocos de código por placeholders preservando offsets das linhas."""
+    """Replace fenced code blocks with blank placeholders, preserving line offsets."""
     out = []
     last = 0
     for m in _FENCED_RE.finditer(md):
         out.append(md[last:m.start()])
-        # Mantém quebras de linha para preservar números de linha.
+        # Keep line breaks so downstream line numbers stay correct.
         out.append("\n" * md[m.start():m.end()].count("\n"))
         last = m.end()
     out.append(md[last:])
@@ -139,7 +128,7 @@ def extract_headings(md: str) -> list[Heading]:
                 level=len(m.group(1)),
                 text=text,
                 line=line,
-                anchor=_slugify_anchor(text),
+                anchor=slugify(text),
             )
         )
     return headings

@@ -135,19 +135,19 @@ def cmd_stats(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="markdown-hero", description="Utilitários de Markdown.")
+    p = argparse.ArgumentParser(prog="markdown-hero", description="Markdown utilities.")
     p.add_argument("--version", action="version", version=f"markdown_hero {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sp = sub.add_parser("strip", help="reduz Markdown a texto plano normalizado")
-    sp.add_argument("input", help="arquivo .md ou '-' para stdin")
-    sp.add_argument("-o", "--output", help="arquivo de saída (default: stdout)")
-    sp.add_argument("--no-numbers", action="store_true", help="remove dígitos")
-    sp.add_argument("--keep-math", action="store_true", help="preserva sinais matemáticos")
-    sp.add_argument("--keep-latex-text", action="store_true", help="preserva texto de fórmulas")
+    sp = sub.add_parser("strip", help="reduce Markdown to normalized plain text")
+    sp.add_argument("input", help=".md file or '-' for stdin")
+    sp.add_argument("-o", "--output", help="output file (default: stdout)")
+    sp.add_argument("--no-numbers", action="store_true", help="strip digits as well")
+    sp.add_argument("--keep-math", action="store_true", help="keep math symbols verbatim")
+    sp.add_argument("--keep-latex-text", action="store_true", help="keep formula text from $...$")
     sp.set_defaults(func=cmd_strip)
 
-    sp = sub.add_parser("chunk", help="divide um documento em chunks (JSON)")
+    sp = sub.add_parser("chunk", help="split a document into chunks (JSON output)")
     sp.add_argument("input")
     sp.add_argument("-o", "--output")
     sp.add_argument("--purpose", choices=["rag", "finetune", "summary", "generic"], default="generic")
@@ -155,7 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--overlap", type=int, default=0)
     sp.set_defaults(func=cmd_chunk)
 
-    sp = sub.add_parser("append", help="concatena vários arquivos Markdown")
+    sp = sub.add_parser("append", help="concatenate several Markdown files")
     sp.add_argument("inputs", nargs="+")
     sp.add_argument("-o", "--output", required=True)
     sp.add_argument("--separator", default="\n\n")
@@ -163,7 +163,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--headings", choices=["preserve", "shift", "wrap"], default="shift")
     sp.set_defaults(func=cmd_append)
 
-    sp = sub.add_parser("break", help="divide um arquivo Markdown nos delimitadores")
+    sp = sub.add_parser("break", help="split a Markdown file at the given delimiter(s)")
     sp.add_argument("input")
     sp.add_argument("delimiter")
     sp.add_argument("--regex", action="store_true")
@@ -172,26 +172,26 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--frontmatter", choices=["replicate", "first", "drop"], default="replicate")
     sp.set_defaults(func=cmd_break)
 
-    sp = sub.add_parser("merge", help="append inteligente com dedupe e TOC")
+    sp = sub.add_parser("merge", help="smart append with section dedupe and optional TOC")
     sp.add_argument("inputs", nargs="+")
     sp.add_argument("-o", "--output", required=True)
     sp.add_argument("--no-dedupe", action="store_true")
     sp.add_argument("--toc", action="store_true")
     sp.set_defaults(func=cmd_merge)
 
-    sp = sub.add_parser("word", help="converte Markdown para .docx")
+    sp = sub.add_parser("word", help="render Markdown to a .docx file")
     sp.add_argument("input")
     sp.add_argument("-o", "--output", required=True)
     sp.add_argument("--template")
     sp.set_defaults(func=cmd_word)
 
-    sp = sub.add_parser("lint", help="verifica problemas estruturais")
+    sp = sub.add_parser("lint", help="report structural issues in a Markdown file")
     sp.add_argument("input")
     sp.add_argument("--json", action="store_true")
     sp.add_argument("-o", "--output")
     sp.set_defaults(func=cmd_lint)
 
-    sp = sub.add_parser("stats", help="contagem de palavras e tempo de leitura")
+    sp = sub.add_parser("stats", help="word count and reading time")
     sp.add_argument("input")
     sp.set_defaults(func=cmd_stats)
 
