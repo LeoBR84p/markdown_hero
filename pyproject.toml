@@ -1,0 +1,108 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markdown_hero"
+version = "0.1.0"
+description = "Markdown processing utilities: strip, chunk, append, break, Word export, lint, and more."
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = { file = "LICENSE" }
+authors = [{ name = "Bernardo Leandro", email = "bernardo.leandro@gmail.com" }]
+keywords = ["markdown", "docx", "rag", "chunking", "nlp"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Topic :: Text Processing :: Markup :: Markdown",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+dependencies = [
+  "markdown-it-py>=3.0",
+  "mdit-py-plugins>=0.4",
+  "python-docx>=1.1",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+tokenizers = ["tiktoken>=0.7"]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "tiktoken>=0.7",
+]
+
+[project.scripts]
+markdown-hero = "markdown_hero.cli:main"
+
+[project.urls]
+Repository = "https://github.com/leobr84p/markdown_hero"
+Documentation = "https://github.com/leobr84p/markdown_hero/blob/main/docs/reference.md"
+Issues = "https://github.com/leobr84p/markdown_hero/issues"
+Changelog = "https://github.com/leobr84p/markdown_hero/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["markdown_hero"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "markdown_hero",
+  "tests",
+  "docs",
+  "README.md",
+  "LICENSE",
+  "CHANGELOG.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  "pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.pyright]
+include = ["markdown_hero", "tests"]
+typeCheckingMode = "strict"
+pythonVersion = "3.10"
+# python-docx and yaml ship without type stubs; the resulting "Unknown"
+# diagnostics are noise from external libraries, not real type problems.
+# Equally, pyright's strict mode flags ``field(default_factory=list)`` as
+# unknown variable type even when the field itself has an explicit
+# ``list[str]`` annotation. We disable those reports globally and rely
+# on the test suite to catch real issues at those call sites.
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
+reportUnknownParameterType = "warning"
+reportUnknownLambdaType = "warning"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",   # pycodestyle / pyflakes
+  "I",             # isort
+  "B",             # bugbear
+  "UP",            # pyupgrade
+  "N",             # naming
+  "RUF",           # ruff-specific
+  "SIM",           # simplify
+]
+ignore = [
+  "E501",   # handled by ruff format
+  "RUF001", # MULTIPLICATION SIGN, etc. are intentional in math docs/strings
+  "RUF002",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011", "N802", "E402"]
