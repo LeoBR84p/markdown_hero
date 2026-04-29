@@ -1,4 +1,5 @@
 """CLI: markdown-hero <subcomando>."""
+
 from __future__ import annotations
 
 import argparse
@@ -150,7 +151,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("chunk", help="split a document into chunks (JSON output)")
     sp.add_argument("input")
     sp.add_argument("-o", "--output")
-    sp.add_argument("--purpose", choices=["rag", "finetune", "summary", "generic"], default="generic")
+    sp.add_argument(
+        "--purpose", choices=["rag", "finetune", "summary", "generic"], default="generic"
+    )
     sp.add_argument("--max-tokens", type=int, default=0)
     sp.add_argument("--overlap", type=int, default=0)
     sp.set_defaults(func=cmd_chunk)

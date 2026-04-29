@@ -4,11 +4,13 @@ The public entry point is :func:`extract_chunks`. The output is a list
 of :class:`Chunk` objects with rich metadata that downstream consumers
 (RAG indexers, fine-tuning pipelines, summarizers) can use directly.
 """
+
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import replace
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 from .extract import remove_frontmatter
 from .models import Chunk
@@ -116,9 +118,7 @@ def extract_chunks(
     elif strategy == "semantic":
         chunks = _chunk_semantic(body, max_tokens, overlap, tok)
     else:
-        chunks = _chunk_structural(
-            body, strategy, max_tokens, overlap, min_tokens, source, tok
-        )
+        chunks = _chunk_structural(body, strategy, max_tokens, overlap, min_tokens, source, tok)
 
     for i, c in enumerate(chunks):
         chunks[i] = replace(c, index=i)
@@ -204,13 +204,15 @@ def _split_sections(body: str) -> list[dict[str, Any]]:
         path = [(lvl, t) for lvl, t in path if lvl < level]
         path.append((level, title))
         end = headings[i + 1].start() if i + 1 < len(headings) else len(body)
-        text = body[m.start():end]
-        sections.append({
-            "text": text,
-            "path": [t for _, t in path],
-            "start": m.start(),
-            "end": end,
-        })
+        text = body[m.start() : end]
+        sections.append(
+            {
+                "text": text,
+                "path": [t for _, t in path],
+                "start": m.start(),
+                "end": end,
+            }
+        )
     return sections
 
 
@@ -219,16 +221,14 @@ def _mask_code(body: str) -> str:
     out = []
     last = 0
     for m in _RE_FENCED.finditer(body):
-        out.append(body[last:m.start()])
+        out.append(body[last : m.start()])
         out.append("\n" * m.group(0).count("\n"))
         last = m.end()
     out.append(body[last:])
     return "".join(out)
 
 
-def _subsplit_section(
-    base: Chunk, max_tokens: int, overlap: int, tok: Tokenizer
-) -> list[Chunk]:
+def _subsplit_section(base: Chunk, max_tokens: int, overlap: int, tok: Tokenizer) -> list[Chunk]:
     """Subdivide an oversized section by paragraph, keeping code blocks intact."""
     pieces = _split_preserving_blocks(base.text)
     chunks: list[Chunk] = []
@@ -239,14 +239,16 @@ def _subsplit_section(
         ptok = tok(piece)
         if buf and buf_tokens + ptok > max_tokens:
             text = "\n\n".join(buf).strip()
-            chunks.append(replace(
-                base,
-                text=text,
-                char_start=cursor,
-                char_end=cursor + len(text),
-                token_count=buf_tokens,
-                type=_classify(text),
-            ))
+            chunks.append(
+                replace(
+                    base,
+                    text=text,
+                    char_start=cursor,
+                    char_end=cursor + len(text),
+                    token_count=buf_tokens,
+                    type=_classify(text),
+                )
+            )
             cursor += len(text)
             if overlap > 0 and chunks:
                 buf, buf_tokens = _make_overlap(buf, overlap, tok)
@@ -256,35 +258,49 @@ def _subsplit_section(
             # An isolated block larger than max_tokens becomes a single oversized chunk.
             if buf:
                 text = "\n\n".join(buf).strip()
-                chunks.append(replace(
-                    base, text=text, char_start=cursor,
-                    char_end=cursor + len(text),
-                    token_count=buf_tokens, type=_classify(text),
-                ))
+                chunks.append(
+                    replace(
+                        base,
+                        text=text,
+                        char_start=cursor,
+                        char_end=cursor + len(text),
+                        token_count=buf_tokens,
+                        type=_classify(text),
+                    )
+                )
                 cursor += len(text)
                 buf, buf_tokens = [], 0
-            chunks.append(replace(
-                base, text=piece.strip(), char_start=cursor,
-                char_end=cursor + len(piece),
-                token_count=ptok, type=_classify(piece), oversized=True,
-            ))
+            chunks.append(
+                replace(
+                    base,
+                    text=piece.strip(),
+                    char_start=cursor,
+                    char_end=cursor + len(piece),
+                    token_count=ptok,
+                    type=_classify(piece),
+                    oversized=True,
+                )
+            )
             cursor += len(piece)
             continue
         buf.append(piece)
         buf_tokens += ptok
     if buf:
         text = "\n\n".join(buf).strip()
-        chunks.append(replace(
-            base, text=text, char_start=cursor,
-            char_end=cursor + len(text),
-            token_count=buf_tokens, type=_classify(text),
-        ))
+        chunks.append(
+            replace(
+                base,
+                text=text,
+                char_start=cursor,
+                char_end=cursor + len(text),
+                token_count=buf_tokens,
+                type=_classify(text),
+            )
+        )
     return chunks
 
 
-def _make_overlap(
-    buf: list[str], overlap_tokens: int, tok: Tokenizer
-) -> tuple[list[str], int]:
+def _make_overlap(buf: list[str], overlap_tokens: int, tok: Tokenizer) -> tuple[list[str], int]:
     """Return the tail of the previous buffer to use as overlap for the next chunk."""
     keep: list[str] = []
     total = 0
@@ -302,7 +318,7 @@ def _split_preserving_blocks(text: str) -> list[str]:
     parts: list[str] = []
     last = 0
     for m in _RE_FENCED.finditer(text):
-        before = text[last:m.start()]
+        before = text[last : m.start()]
         parts.extend(p for p in re.split(r"\n\s*\n", before) if p.strip())
         parts.append(m.group(0))
         last = m.end()
@@ -325,20 +341,19 @@ def _chunk_fixed(body: str, max_tokens: int, overlap: int, tok: Tokenizer) -> li
                 break
             text = candidate
             j += 1
-        chunks.append(Chunk(
-            text=text,
-            heading_path=[],
-            char_start=0,
-            char_end=len(text),
-            token_count=tok(text),
-            type="prose",
-        ))
+        chunks.append(
+            Chunk(
+                text=text,
+                heading_path=[],
+                char_start=0,
+                char_end=len(text),
+                token_count=tok(text),
+                type="prose",
+            )
+        )
         if j == i:
             j = i + 1
-        if overlap > 0:
-            i = max(j - max(1, overlap // 4), i + 1)
-        else:
-            i = j
+        i = max(j - max(1, overlap // 4), i + 1) if overlap > 0 else j
     return chunks
 
 
@@ -351,10 +366,15 @@ def _chunk_semantic(body: str, max_tokens: int, overlap: int, tok: Tokenizer) ->
         ptok = tok(p)
         if buf and total + ptok > max_tokens:
             text = "\n\n".join(buf).strip()
-            chunks.append(Chunk(
-                text=text, token_count=total, type=_classify(text),
-                char_start=0, char_end=len(text),
-            ))
+            chunks.append(
+                Chunk(
+                    text=text,
+                    token_count=total,
+                    type=_classify(text),
+                    char_start=0,
+                    char_end=len(text),
+                )
+            )
             if overlap > 0:
                 buf, total = _make_overlap(buf, overlap, tok)
             else:
@@ -363,8 +383,13 @@ def _chunk_semantic(body: str, max_tokens: int, overlap: int, tok: Tokenizer) ->
         total += ptok
     if buf:
         text = "\n\n".join(buf).strip()
-        chunks.append(Chunk(
-            text=text, token_count=total, type=_classify(text),
-            char_start=0, char_end=len(text),
-        ))
+        chunks.append(
+            Chunk(
+                text=text,
+                token_count=total,
+                type=_classify(text),
+                char_start=0,
+                char_end=len(text),
+            )
+        )
     return chunks

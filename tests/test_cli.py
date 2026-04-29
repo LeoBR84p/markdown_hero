@@ -36,7 +36,9 @@ def test_cli_append_and_break(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     capsys.readouterr()
 
     out_dir = tmp_path / "parts"
-    assert main(["break", str(out), "## B", "--output-dir", str(out_dir), "--include", "after"]) == 0
+    assert (
+        main(["break", str(out), "## B", "--output-dir", str(out_dir), "--include", "after"]) == 0
+    )
 
 
 def test_cli_lint_and_stats(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

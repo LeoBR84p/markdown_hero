@@ -41,7 +41,7 @@ def test_strip_html_links_images():
     assert "x" in strip_links(md)
     assert "[a](u.png)" not in strip_images(md)
     assert "a" in strip_images(md)
-    assert "" == strip_images("![a](u.png)", keep_alt=False).strip()
+    assert strip_images("![a](u.png)", keep_alt=False).strip() == ""
 
 
 def test_strip_code_blocks():

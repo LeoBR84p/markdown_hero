@@ -3,6 +3,7 @@
 Only data containers live here. Logic and parsing belong to the modules
 that produce these structures.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

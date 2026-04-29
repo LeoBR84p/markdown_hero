@@ -3,11 +3,12 @@
 Functions here are pure: no IO, no mutation of input. Code blocks are
 preserved verbatim so technical content is never rewritten.
 """
+
 from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Callable
+from collections.abc import Callable
 
 _RE_FENCED = re.compile(r"^(```|~~~)[^\n]*\n.*?^\1\s*$", re.MULTILINE | re.DOTALL)
 _RE_INLINE_CODE = re.compile(r"`[^`\n]*`")

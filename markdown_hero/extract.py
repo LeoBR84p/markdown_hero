@@ -5,6 +5,7 @@ plain dataclasses defined in :mod:`markdown_hero.models`. They do *not*
 provide rendering or transformation — see :mod:`markdown_hero.transform`
 for that.
 """
+
 from __future__ import annotations
 
 import re
@@ -26,9 +27,7 @@ _LINK_RE = re.compile(
     r"(?<!\!)\[(?P<text>(?:[^\[\]]|\[[^\[\]]*\])*)\]\((?P<url>[^)\s]*)(?:\s+\"(?P<title>[^\"]*)\")?\)"
 )
 _AUTOLINK_RE = re.compile(r"<(?P<url>https?://[^>\s]+)>")
-_IMAGE_RE = re.compile(
-    r"!\[(?P<alt>[^\]]*)\]\((?P<url>[^)\s]+)(?:\s+\"(?P<title>[^\"]*)\")?\)"
-)
+_IMAGE_RE = re.compile(r"!\[(?P<alt>[^\]]*)\]\((?P<url>[^)\s]+)(?:\s+\"(?P<title>[^\"]*)\")?\)")
 
 
 def extract_frontmatter(md: str) -> dict[str, Any]:
@@ -62,9 +61,7 @@ def extract_frontmatter(md: str) -> dict[str, Any]:
     if data is None:
         return {}
     if not isinstance(data, dict):
-        raise FrontmatterError(
-            f"frontmatter must be a YAML mapping, got {type(data).__name__}"
-        )
+        raise FrontmatterError(f"frontmatter must be a YAML mapping, got {type(data).__name__}")
     # yaml.safe_load returns Any; the runtime check above narrows to dict.
     return cast("dict[str, Any]", data)
 
@@ -88,7 +85,7 @@ def remove_frontmatter(md: str) -> tuple[str, dict[str, Any]]:
     if not m:
         return md, {}
     fm = extract_frontmatter(md)
-    return md[m.end():], fm
+    return md[m.end() :], fm
 
 
 def _strip_for_scan(md: str) -> str:
@@ -96,9 +93,9 @@ def _strip_for_scan(md: str) -> str:
     out = []
     last = 0
     for m in _FENCED_RE.finditer(md):
-        out.append(md[last:m.start()])
+        out.append(md[last : m.start()])
         # Keep line breaks so downstream line numbers stay correct.
-        out.append("\n" * md[m.start():m.end()].count("\n"))
+        out.append("\n" * md[m.start() : m.end()].count("\n"))
         last = m.end()
     out.append(md[last:])
     return "".join(out)

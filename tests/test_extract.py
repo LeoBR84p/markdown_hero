@@ -12,7 +12,6 @@ from markdown_hero import (
     remove_frontmatter,
 )
 
-
 SAMPLE = """---
 title: Doc
 tags: [a, b]
@@ -56,7 +55,7 @@ def test_headings():
 
 def test_links_images():
     links = extract_links(SAMPLE)
-    assert any(l.url == "https://x.com" for l in links)
+    assert any(link.url == "https://x.com" for link in links)
     images = extract_images(SAMPLE)
     assert images[0].alt == "logo"
     assert images[0].url == "logo.png"
@@ -106,10 +105,10 @@ def test_empty_frontmatter_returns_empty_dict():
 def test_extract_links_includes_autolinks():
     md = "see <https://example.com> and [docs](https://x.com)"
     links = extract_links(md)
-    types = {l.type for l in links}
+    types = {link.type for link in links}
     assert "autolink" in types
     assert "inline" in types
-    assert any(l.url == "https://example.com" for l in links)
+    assert any(link.url == "https://example.com" for link in links)
 
 
 def test_extract_links_ignores_links_inside_code_blocks():

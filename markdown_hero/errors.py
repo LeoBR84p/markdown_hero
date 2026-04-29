@@ -5,6 +5,7 @@ Domain errors raised by the package. Generic Python exceptions
 validation; this module is reserved for failures with a Markdown-specific
 meaning.
 """
+
 from __future__ import annotations
 
 

@@ -66,7 +66,9 @@ def test_break_string_delimiter(tmp_path: Path):
 def test_break_include_after(tmp_path: Path):
     src = _w(tmp_path / "doc.md", "intro\n\n# Cap A\n\ntexto a\n\n# Cap B\n\ntexto b")
     out_dir = tmp_path / "out"
-    paths = markdown_break(src, r"^# .+$", is_regex=True, include_delimiter="after", output_dir=out_dir)
+    paths = markdown_break(
+        src, r"^# .+$", is_regex=True, include_delimiter="after", output_dir=out_dir
+    )
     contents = [p.read_text(encoding="utf-8") for p in paths]
     assert any(c.startswith("# Cap A") for c in contents)
     assert any(c.startswith("# Cap B") for c in contents)
@@ -129,7 +131,9 @@ def test_merge_rebuild_toc_inserts_table_of_contents(tmp_path: Path):
 
 def test_merge_dedupes_consecutive_sections(tmp_path: Path):
     a = _w(tmp_path / "a.md", "# Intro\n\nA1\n\n# Outro\n\nB1\n")
-    b = _w(tmp_path / "b.md", "# Intro\n\nDUPLICADO\n")  # heading idêntico ao de cima depois do shift
+    b = _w(
+        tmp_path / "b.md", "# Intro\n\nDUPLICADO\n"
+    )  # heading idêntico ao de cima depois do shift
     out = tmp_path / "out.md"
     # Após shift, b vira "## Intro" (não duplica). Forçamos preserve para testar dedupe direto.
     markdown_append(a, b, output=out, headings="preserve", frontmatter="drop")

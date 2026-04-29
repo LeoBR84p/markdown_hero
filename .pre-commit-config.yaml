@@ -15,6 +15,7 @@ repos:
           - python-docx>=1.1
           - PyYAML>=6.0
           - tiktoken>=0.7
+          - pytest>=8.0
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.42.0
     hooks:
@@ -27,3 +28,8 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-added-large-files
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.10.0
+    hooks:
+      - id: pip-audit
+        args: ["--strict"]

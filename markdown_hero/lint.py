@@ -4,6 +4,7 @@ This module produces structural diagnostics (skipped heading levels,
 duplicate anchors, malformed code fences, empty links). It does not
 attempt to validate prose or check link targets against the network.
 """
+
 from __future__ import annotations
 
 import re
@@ -59,23 +60,27 @@ def lint(md: str) -> list[Issue]:
     prev = 0
     for h in headings:
         if prev and h.level > prev + 1:
-            issues.append(Issue(
-                rule="heading-skip",
-                message=f"heading H{h.level} follows H{prev} (skipped one or more levels)",
-                line=h.line,
-                severity="warning",
-            ))
+            issues.append(
+                Issue(
+                    rule="heading-skip",
+                    message=f"heading H{h.level} follows H{prev} (skipped one or more levels)",
+                    line=h.line,
+                    severity="warning",
+                )
+            )
         prev = h.level
 
     anchors: dict[str, int] = {}
     for h in headings:
         if h.anchor in anchors:
-            issues.append(Issue(
-                rule="duplicate-anchor",
-                message=f"duplicate anchor '{h.anchor}' (also at line {anchors[h.anchor]})",
-                line=h.line,
-                severity="warning",
-            ))
+            issues.append(
+                Issue(
+                    rule="duplicate-anchor",
+                    message=f"duplicate anchor '{h.anchor}' (also at line {anchors[h.anchor]})",
+                    line=h.line,
+                    severity="warning",
+                )
+            )
         else:
             anchors[h.anchor] = h.line
 

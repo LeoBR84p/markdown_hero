@@ -3,11 +3,13 @@
 Functions in this module read from disk, transform the content in
 memory, and write the result back. They never mutate the input files.
 """
+
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable, Literal
+from typing import Any, Literal
 
 import yaml
 

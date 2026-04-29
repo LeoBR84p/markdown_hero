@@ -4,6 +4,7 @@ Public surface is :func:`strip`. This module is intentionally focused:
 it does not preserve any structure (paragraphs, headings, lists). For a
 lighter conversion that keeps paragraphs, see ``transform.md_to_plain``.
 """
+
 from __future__ import annotations
 
 import re
@@ -102,9 +103,13 @@ def strip(
     out_chars: list[str] = []
     for ch in s:
         cat = unicodedata.category(ch)
-        if cat.startswith("L") or cat.startswith("N") or ch in (" ", "\t", "\n"):
-            out_chars.append(ch)
-        elif keep_math and ch in _MATH_SYMBOLS_SET:
+        if (
+            cat.startswith("L")
+            or cat.startswith("N")
+            or ch in (" ", "\t", "\n")
+            or keep_math
+            and ch in _MATH_SYMBOLS_SET
+        ):
             out_chars.append(ch)
         elif ch in _MATH_SYMBOLS_SET and not keep_math:
             # Math symbols without keep_math are deleted with no replacement,

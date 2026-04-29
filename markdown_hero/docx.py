@@ -4,12 +4,15 @@ Public surface is :func:`word_format`. Helpers in this module operate on
 plain dictionaries produced by an internal block parser; they are not
 intended for external use.
 """
+
 from __future__ import annotations
 
+import contextlib
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from docx import Document
 from docx.enum.table import WD_ALIGN_VERTICAL
@@ -116,11 +119,17 @@ def _parse_blocks(body: str) -> list[dict[str, Any]]:
     blocks: list[dict[str, Any]] = []
     fenced_segments: list[tuple[int, int, dict[str, Any]]] = []
     for m in _FENCED_RE.finditer(body):
-        fenced_segments.append((m.start(), m.end(), {
-            "kind": "code",
-            "lang": m.group(2).strip() or None,
-            "code": m.group(3).rstrip("\n"),
-        }))
+        fenced_segments.append(
+            (
+                m.start(),
+                m.end(),
+                {
+                    "kind": "code",
+                    "lang": m.group(2).strip() or None,
+                    "code": m.group(3).rstrip("\n"),
+                },
+            )
+        )
 
     cursor = 0
     for start, end, code_block in fenced_segments:
@@ -199,13 +208,15 @@ def _consume_table(line: str, state: _ParseState) -> bool:
     while j < len(state.lines) and state.lines[j].strip() and "|" in state.lines[j]:
         rows.append(_split_row(state.lines[j]))
         j += 1
-    state.blocks.append({
-        "kind": "table",
-        "headers": headers,
-        "rows": rows,
-        "alignments": aligns,
-        "caption": state.pending_caption,
-    })
+    state.blocks.append(
+        {
+            "kind": "table",
+            "headers": headers,
+            "rows": rows,
+            "alignments": aligns,
+            "caption": state.pending_caption,
+        }
+    )
     state.pending_caption = None
     state.i = j
     return True
@@ -243,8 +254,10 @@ def _consume_list(line: str, state: _ParseState) -> bool:
     if not (_UL_RE.match(line) or _OL_RE.match(line)):
         return False
     items: list[dict[str, Any]] = []
-    while state.i < len(state.lines) and state.lines[state.i].strip() and (
-        _UL_RE.match(state.lines[state.i]) or _OL_RE.match(state.lines[state.i])
+    while (
+        state.i < len(state.lines)
+        and state.lines[state.i].strip()
+        and (_UL_RE.match(state.lines[state.i]) or _OL_RE.match(state.lines[state.i]))
     ):
         items.append(_parse_list_item(state.lines[state.i]))
         state.i += 1
@@ -399,7 +412,7 @@ def _render_inline(paragraph: Any, text: str, styles: dict[str, Any]) -> None:
     pos = 0
     for m in _INLINE_RE.finditer(text):
         if m.start() > pos:
-            paragraph.add_run(text[pos:m.start()])
+            paragraph.add_run(text[pos : m.start()])
         if m.group("bold"):
             run = paragraph.add_run(m.group("bold").strip("*_"))
             run.bold = True
@@ -457,10 +470,8 @@ def _render_table(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> No
     table = doc.add_table(rows=1 + len(rows), cols=len(headers))
     # Fallback: minimal templates may not register "Table Grid"; in that
     # case the table still renders, just without the default border style.
-    try:
+    with contextlib.suppress(KeyError):
         table.style = "Table Grid"
-    except KeyError:
-        pass
     _render_table_header(table, headers, styles)
     _render_table_body(table, headers, rows, aligns, styles)
 
@@ -572,6 +583,7 @@ def _add_hyperlink(paragraph: Any, url: str, text: str, color: str) -> None:
 
 
 # --- Estilos customizados ----------------------------------------------------
+
 
 def _ensure_custom_styles(doc: Any, styles: dict[str, Any]) -> None:
     from docx.enum.style import WD_STYLE_TYPE

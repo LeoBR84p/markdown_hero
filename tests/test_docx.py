@@ -6,7 +6,6 @@ docx = pytest.importorskip("docx")
 
 from markdown_hero import word_format
 
-
 SAMPLE = """# Título
 
 Parágrafo com **negrito**, *itálico* e `inline code`.
