@@ -27,7 +27,7 @@ _RE_HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$", re.MULTILINE)
 def _default_tokenizer() -> Callable[[str], int]:
     """Default tokenizer: tiktoken cl100k_base when installed, an approximation otherwise."""
     try:
-        import tiktoken  # type: ignore
+        import tiktoken
 
         enc = tiktoken.get_encoding("cl100k_base")
         return lambda s: len(enc.encode(s))

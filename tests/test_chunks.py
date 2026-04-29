@@ -84,3 +84,63 @@ def test_purpose_finetune_no_overlap():
 def test_chunk_carries_source_field():
     chunks = extract_chunks("# A\n\ntext", source="docs/a.md")
     assert all(c.source == "docs/a.md" for c in chunks)
+
+
+def test_empty_input_returns_no_chunks():
+    assert extract_chunks("") == []
+    assert extract_chunks("    \n\n  ") == []
+
+
+def test_fixed_strategy_with_overlap():
+    body = " ".join(f"word{i}" for i in range(120))
+    chunks = extract_chunks(
+        body, strategy="fixed", max_tokens=20, overlap=8, tokenizer=lambda s: len(s.split())
+    )
+    assert len(chunks) > 1
+    assert all(c.token_count <= 25 for c in chunks)
+
+
+def test_semantic_strategy_with_overlap():
+    body = "\n\n".join(f"paragraph {i} content" for i in range(40))
+    chunks = extract_chunks(
+        body, strategy="semantic", max_tokens=15, overlap=5, tokenizer=lambda s: len(s.split())
+    )
+    assert len(chunks) > 1
+
+
+def test_semantic_strategy_no_overlap():
+    body = "\n\n".join(f"paragraph {i}" for i in range(20))
+    chunks = extract_chunks(
+        body, strategy="semantic", max_tokens=10, overlap=0, tokenizer=lambda s: len(s.split())
+    )
+    assert len(chunks) > 1
+
+
+def test_subsplit_with_oversized_block_inside_section():
+    big_block = "x" * 5000
+    md = f"# Doc\n\nintro paragraph\n\n```\n{big_block}\n```\n\ntail paragraph\n"
+    chunks = extract_chunks(md, strategy="hybrid", max_tokens=20, tokenizer=lambda s: len(s))
+    assert any(c.oversized for c in chunks)
+
+
+def test_min_tokens_merges_small_section():
+    md = "# Tiny\n\nshort\n\n# Big\n\n" + ("word " * 50)
+    chunks_no_min = extract_chunks(
+        md, strategy="structural", min_tokens=0, tokenizer=lambda s: len(s.split())
+    )
+    chunks_with_min = extract_chunks(
+        md, strategy="structural", min_tokens=20, tokenizer=lambda s: len(s.split())
+    )
+    assert len(chunks_with_min) <= len(chunks_no_min)
+
+
+def test_intro_text_before_first_heading_becomes_chunk():
+    md = "preamble before any heading\n\n# Title\n\nbody"
+    chunks = extract_chunks(md, strategy="structural")
+    assert any(c.heading_path == [] and "preamble" in c.text for c in chunks)
+
+
+def test_classify_detects_code_section():
+    md = "# Doc\n\n```python\nfor i in range(10):\n    print(i)\n```\n"
+    chunks = extract_chunks(md, strategy="structural", max_tokens=500)
+    assert any(c.type == "code" for c in chunks)
