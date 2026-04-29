@@ -116,43 +116,62 @@ def extract_chunks(
     elif strategy == "semantic":
         chunks = _chunk_semantic(body, max_tokens, overlap, tok)
     else:
-        sections = _split_sections(body)
-        chunks = []
-        for sec in sections:
-            sec_text = sec["text"]
-            sec_tokens = tok(sec_text)
-            base = Chunk(
-                text=sec_text.strip(),
-                heading_path=sec["path"],
-                char_start=sec["start"],
-                char_end=sec["end"],
-                token_count=sec_tokens,
-                type=_classify(sec_text),
-                source=source,
-            )
-            if strategy == "structural" or sec_tokens <= max_tokens:
-                if sec_tokens > max_tokens:
-                    base = replace(base, oversized=True)
-                if sec_tokens >= min_tokens or not chunks:
-                    chunks.append(base)
-                else:
-                    # mescla seções minúsculas com a anterior.
-                    prev = chunks[-1]
-                    chunks[-1] = replace(
-                        prev,
-                        text=(prev.text + "\n\n" + base.text).strip(),
-                        char_end=base.char_end,
-                        token_count=prev.token_count + sec_tokens,
-                        type="mixed",
-                    )
-            else:
-                chunks.extend(
-                    _subsplit_section(base, max_tokens, overlap, tok)
-                )
+        chunks = _chunk_structural(
+            body, strategy, max_tokens, overlap, min_tokens, source, tok
+        )
 
     for i, c in enumerate(chunks):
         chunks[i] = replace(c, index=i)
     return chunks
+
+
+def _chunk_structural(
+    body: str,
+    strategy: Strategy,
+    max_tokens: int,
+    overlap: int,
+    min_tokens: int,
+    source: str | None,
+    tok: Tokenizer,
+) -> list[Chunk]:
+    """Walk heading-aligned sections and emit chunks with breadcrumb metadata."""
+    chunks: list[Chunk] = []
+    for sec in _split_sections(body):
+        sec_text = sec["text"]
+        sec_tokens = tok(sec_text)
+        base = Chunk(
+            text=sec_text.strip(),
+            heading_path=sec["path"],
+            char_start=sec["start"],
+            char_end=sec["end"],
+            token_count=sec_tokens,
+            type=_classify(sec_text),
+            source=source,
+        )
+        if strategy == "structural" or sec_tokens <= max_tokens:
+            _append_or_merge(chunks, base, sec_tokens, max_tokens, min_tokens)
+        else:
+            chunks.extend(_subsplit_section(base, max_tokens, overlap, tok))
+    return chunks
+
+
+def _append_or_merge(
+    chunks: list[Chunk], base: Chunk, sec_tokens: int, max_tokens: int, min_tokens: int
+) -> None:
+    """Append a structural chunk, merging into the previous when below ``min_tokens``."""
+    if sec_tokens > max_tokens:
+        base = replace(base, oversized=True)
+    if sec_tokens >= min_tokens or not chunks:
+        chunks.append(base)
+        return
+    prev = chunks[-1]
+    chunks[-1] = replace(
+        prev,
+        text=(prev.text + "\n\n" + base.text).strip(),
+        char_end=base.char_end,
+        token_count=prev.token_count + sec_tokens,
+        type="mixed",
+    )
 
 
 def _classify(text: str) -> ChunkType:

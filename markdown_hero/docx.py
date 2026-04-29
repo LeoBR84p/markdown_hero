@@ -7,6 +7,7 @@ intended for external use.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -133,94 +134,146 @@ def _parse_blocks(body: str) -> list[dict[str, Any]]:
 
 
 def _parse_non_code(text: str) -> list[dict[str, Any]]:
+    """Walk the input line-by-line and emit non-code blocks.
+
+    The function is a thin state machine that delegates each block kind
+    to a focused handler. ``pending_caption`` tracks the Pandoc-style
+    ``Table:`` line so it can be attached to the most recent table.
+    """
     lines = text.split("\n")
     blocks: list[dict[str, Any]] = []
-    i = 0
-    n = len(lines)
-    pending_caption: str | None = None
-    while i < n:
-        line = lines[i]
+    state = _ParseState(lines=lines, i=0, blocks=blocks, pending_caption=None)
+    while state.i < len(lines):
+        line = lines[state.i]
         if not line.strip():
-            i += 1
+            state.i += 1
             continue
         if _HR_RE.match(line):
             blocks.append({"kind": "hr"})
-            i += 1
+            state.i += 1
             continue
-        m = _HEADING_RE.match(line)
-        if m:
-            blocks.append({"kind": "heading", "level": len(m.group(1)), "text": m.group(2).strip()})
-            i += 1
+        if _consume_heading(line, state):
             continue
-        # Tabela.
-        if "|" in line and i + 1 < n and _TABLE_SEP_RE.match(lines[i + 1]):
-            headers = _split_row(line)
-            aligns = _parse_align(lines[i + 1])
-            rows: list[list[str]] = []
-            j = i + 2
-            while j < n and lines[j].strip() and "|" in lines[j]:
-                rows.append(_split_row(lines[j]))
-                j += 1
-            blocks.append({
-                "kind": "table",
-                "headers": headers,
-                "rows": rows,
-                "alignments": aligns,
-                "caption": pending_caption,
-            })
-            pending_caption = None
-            i = j
+        if _consume_table(line, state):
             continue
-        # Caption (Pandoc-style "Table: ...") aparece após uma tabela; aqui pré-armazenamos.
-        cap = _CAPTION_RE.match(line.strip())
-        if cap:
-            # Atribuir à última tabela emitida.
-            if blocks and blocks[-1]["kind"] == "table":
-                blocks[-1]["caption"] = cap.group(1).strip()
-            else:
-                pending_caption = cap.group(1).strip()
-            i += 1
+        if _consume_caption(line, state):
             continue
-        # Quote.
-        if _QUOTE_RE.match(line):
-            buf: list[str] = []
-            while i < n and (_QUOTE_RE.match(lines[i]) or (lines[i].strip() and not _is_block_start(lines[i]))):
-                qm = _QUOTE_RE.match(lines[i])
-                buf.append(qm.group(1) if qm else lines[i].strip())
-                i += 1
-            blocks.append({"kind": "quote", "text": " ".join(buf).strip()})
+        if _consume_quote(line, state):
             continue
-        # Lista (UL ou OL).
-        if _UL_RE.match(line) or _OL_RE.match(line):
-            items: list[dict[str, Any]] = []
-            while i < n and lines[i].strip() and (_UL_RE.match(lines[i]) or _OL_RE.match(lines[i])):
-                ul = _UL_RE.match(lines[i])
-                ol = _OL_RE.match(lines[i])
-                if ul:
-                    indent, _, text_part = ul.groups()
-                    items.append({
-                        "ordered": False,
-                        "level": len(indent) // 2,
-                        "text": text_part,
-                    })
-                elif ol:
-                    indent, _, text_part = ol.groups()
-                    items.append({
-                        "ordered": True,
-                        "level": len(indent) // 2,
-                        "text": text_part,
-                    })
-                i += 1
-            blocks.append({"kind": "list", "items": items})
+        if _consume_list(line, state):
             continue
-        # Parágrafo (acumula até linha vazia).
-        buf = [line]
-        i += 1
-        while i < n and lines[i].strip() and not _is_block_start(lines[i]):
-            buf.append(lines[i])
-            i += 1
-        blocks.append({"kind": "paragraph", "text": " ".join(b.strip() for b in buf)})
+        _consume_paragraph(line, state)
     return blocks
+
+
+@dataclass
+class _ParseState:
+    """Mutable cursor used while walking lines in :func:`_parse_non_code`."""
+
+    lines: list[str]
+    i: int
+    blocks: list[dict[str, Any]]
+    pending_caption: str | None
+
+
+def _consume_heading(line: str, state: _ParseState) -> bool:
+    m = _HEADING_RE.match(line)
+    if not m:
+        return False
+    state.blocks.append({"kind": "heading", "level": len(m.group(1)), "text": m.group(2).strip()})
+    state.i += 1
+    return True
+
+
+def _consume_table(line: str, state: _ParseState) -> bool:
+    if "|" not in line:
+        return False
+    if state.i + 1 >= len(state.lines):
+        return False
+    if not _TABLE_SEP_RE.match(state.lines[state.i + 1]):
+        return False
+    headers = _split_row(line)
+    aligns = _parse_align(state.lines[state.i + 1])
+    rows: list[list[str]] = []
+    j = state.i + 2
+    while j < len(state.lines) and state.lines[j].strip() and "|" in state.lines[j]:
+        rows.append(_split_row(state.lines[j]))
+        j += 1
+    state.blocks.append({
+        "kind": "table",
+        "headers": headers,
+        "rows": rows,
+        "alignments": aligns,
+        "caption": state.pending_caption,
+    })
+    state.pending_caption = None
+    state.i = j
+    return True
+
+
+def _consume_caption(line: str, state: _ParseState) -> bool:
+    cap = _CAPTION_RE.match(line.strip())
+    if not cap:
+        return False
+    text = cap.group(1).strip()
+    if state.blocks and state.blocks[-1]["kind"] == "table":
+        state.blocks[-1]["caption"] = text
+    else:
+        state.pending_caption = text
+    state.i += 1
+    return True
+
+
+def _consume_quote(line: str, state: _ParseState) -> bool:
+    if not _QUOTE_RE.match(line):
+        return False
+    buf: list[str] = []
+    while state.i < len(state.lines) and (
+        _QUOTE_RE.match(state.lines[state.i])
+        or (state.lines[state.i].strip() and not _is_block_start(state.lines[state.i]))
+    ):
+        qm = _QUOTE_RE.match(state.lines[state.i])
+        buf.append(qm.group(1) if qm else state.lines[state.i].strip())
+        state.i += 1
+    state.blocks.append({"kind": "quote", "text": " ".join(buf).strip()})
+    return True
+
+
+def _consume_list(line: str, state: _ParseState) -> bool:
+    if not (_UL_RE.match(line) or _OL_RE.match(line)):
+        return False
+    items: list[dict[str, Any]] = []
+    while state.i < len(state.lines) and state.lines[state.i].strip() and (
+        _UL_RE.match(state.lines[state.i]) or _OL_RE.match(state.lines[state.i])
+    ):
+        items.append(_parse_list_item(state.lines[state.i]))
+        state.i += 1
+    state.blocks.append({"kind": "list", "items": items})
+    return True
+
+
+def _parse_list_item(line: str) -> dict[str, Any]:
+    ul = _UL_RE.match(line)
+    if ul:
+        indent, _, text_part = ul.groups()
+        return {"ordered": False, "level": len(indent) // 2, "text": text_part}
+    ol = _OL_RE.match(line)
+    assert ol is not None  # caller already matched
+    indent, _, text_part = ol.groups()
+    return {"ordered": True, "level": len(indent) // 2, "text": text_part}
+
+
+def _consume_paragraph(line: str, state: _ParseState) -> None:
+    buf = [line]
+    state.i += 1
+    while (
+        state.i < len(state.lines)
+        and state.lines[state.i].strip()
+        and not _is_block_start(state.lines[state.i])
+    ):
+        buf.append(state.lines[state.i])
+        state.i += 1
+    state.blocks.append({"kind": "paragraph", "text": " ".join(b.strip() for b in buf)})
 
 
 def _is_block_start(line: str) -> bool:
@@ -388,26 +441,31 @@ def _render_code(doc: Any, code: str, styles: dict[str, Any]) -> None:
 
 
 def _render_table(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> None:
-    if block.get("caption") and styles["table_caption_centered"]:
-        cap = doc.add_paragraph(block["caption"])
-        cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        for run in cap.runs:
-            run.italic = True
-            run.font.size = Pt(10)
-
     headers = block["headers"]
-    rows = block["rows"]
-    aligns = block.get("alignments") or ["default"] * len(headers)
     if not headers:
         return
-
+    if block.get("caption") and styles["table_caption_centered"]:
+        _render_table_caption(doc, block["caption"])
+    rows = block["rows"]
+    aligns = block.get("alignments") or ["default"] * len(headers)
     table = doc.add_table(rows=1 + len(rows), cols=len(headers))
     try:
         table.style = "Table Grid"
     except KeyError:
         pass
+    _render_table_header(table, headers, styles)
+    _render_table_body(table, headers, rows, aligns, styles)
 
-    # Header.
+
+def _render_table_caption(doc: Any, caption: str) -> None:
+    cap = doc.add_paragraph(caption)
+    cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    for run in cap.runs:
+        run.italic = True
+        run.font.size = Pt(10)
+
+
+def _render_table_header(table: Any, headers: list[str], styles: dict[str, Any]) -> None:
     hdr_cells = table.rows[0].cells
     for j, h in enumerate(headers):
         cell = hdr_cells[j]
@@ -419,11 +477,17 @@ def _render_table(doc: Any, block: dict[str, Any], styles: dict[str, Any]) -> No
         _set_cell_align(p, "center")
         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
         _shade_cell(cell, styles["table_header_bg"])
-
     if styles["table_repeat_header"]:
         _repeat_table_header(table.rows[0])
 
-    # Body.
+
+def _render_table_body(
+    table: Any,
+    headers: list[str],
+    rows: list[list[str]],
+    aligns: list[str],
+    styles: dict[str, Any],
+) -> None:
     for ri, row in enumerate(rows, start=1):
         cells = table.rows[ri].cells
         for j in range(len(headers)):
