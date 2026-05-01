@@ -1,5 +1,11 @@
 # markdown_hero
 
+[![CI](https://github.com/leobr84p/markdown_hero/actions/workflows/ci.yml/badge.svg)](https://github.com/leobr84p/markdown_hero/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/markdown_hero.svg)](https://pypi.org/project/markdown_hero/)
+[![Python versions](https://img.shields.io/pypi/pyversions/markdown_hero.svg)](https://pypi.org/project/markdown_hero/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Typed](https://img.shields.io/badge/typing-typed-brightgreen.svg)](https://peps.python.org/pep-0561/)
+
 Biblioteca Python para tratamento de Markdown — limpeza, chunking, exportação
 para Word (.docx), concatenação, divisão por delimitadores e validação.
 
@@ -54,6 +60,25 @@ markdown-hero break doc.md "---" --output-dir parts/
 markdown-hero lint doc.md
 ```
 
+## Documentação
+
+- Referência técnica: [`docs/reference.md`](docs/reference.md)
+- Índice de utilitários internos: [`docs/helpers.md`](docs/helpers.md)
+- Histórico de versões: [`CHANGELOG.md`](CHANGELOG.md)
+- Como contribuir: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Política de segurança: [`SECURITY.md`](SECURITY.md)
+
+## Contato
+
+Dúvidas, sugestões e relatos:
+
+- E-mail: [bernardo.leandro@gmail.com](mailto:bernardo.leandro@gmail.com)
+- **Inclua sempre o prefixo `Markdown Hero:` no assunto** da mensagem para
+  que ela seja roteada corretamente.
+
+Para vulnerabilidades de segurança, siga as instruções de
+[`SECURITY.md`](SECURITY.md) (mesmo e-mail, mesmo prefixo no assunto).
+
 ## Licença
 
-MIT
+[MIT](LICENSE) © 2026 Bernardo Leandro.
