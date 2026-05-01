@@ -7,17 +7,21 @@ name = "markdown_hero"
 version = "0.1.0"
 description = "Markdown processing utilities: strip, chunk, append, break, Word export, lint, and more."
 readme = "README.md"
-requires-python = ">=3.10"
-license = { text = "MIT" }
-authors = [{ name = "markdown_hero contributors" }]
+requires-python = ">=3.10,<3.14"
+license = { file = "LICENSE" }
+authors = [{ name = "Bernardo Leandro", email = "bernardo.leandro@gmail.com" }]
 keywords = ["markdown", "docx", "rag", "chunking", "nlp"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
+  "Topic :: Text Processing :: Markup :: Markdown",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
 ]
 dependencies = [
   "markdown-it-py>=3.0",
@@ -39,9 +43,25 @@ markdown-hero = "markdown_hero.cli:main"
 
 [project.urls]
 Repository = "https://github.com/leobr84p/markdown_hero"
+Documentation = "https://github.com/leobr84p/markdown_hero/blob/main/docs/reference.md"
+Issues = "https://github.com/leobr84p/markdown_hero/issues"
+Changelog = "https://github.com/leobr84p/markdown_hero/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["markdown_hero"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "markdown_hero",
+  "tests",
+  "docs",
+  "README.md",
+  "LICENSE",
+  "CHANGELOG.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  "pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
