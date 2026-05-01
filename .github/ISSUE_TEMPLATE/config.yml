@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/leobr84p/markdown_hero/blob/main/SECURITY.md
+    about: Please follow the disclosure process in SECURITY.md instead of opening a public issue.
+  - name: Contact maintainer
+    url: mailto:bernardo.leandro@gmail.com?subject=Markdown%20Hero%3A%20
+    about: For questions or feedback, email the maintainer with the subject prefix "Markdown Hero:".

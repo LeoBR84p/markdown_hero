@@ -4,6 +4,9 @@ Public API only. Implementation details (block parsers, regexes) live in
 private helpers and are not re-exported here.
 """
 
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+
 from .chunks import Chunk, extract_chunks
 from .docx import word_format
 from .errors import FrontmatterError, MarkdownHeroError, MarkdownStructureError
@@ -32,7 +35,15 @@ from .transform import (
     strip_links,
 )
 
-__version__ = "0.1.0"
+try:
+    __version__ = _pkg_version("markdown_hero")
+except PackageNotFoundError:
+    # Package is not installed (e.g. running from a source checkout without
+    # `pip install -e .`). Fall back to the declared version so __version__
+    # is always defined.
+    __version__ = "0.1.0"
+
+del _pkg_version, PackageNotFoundError
 
 __all__ = [
     "Chunk",
