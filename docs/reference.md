@@ -1,24 +1,24 @@
-# markdown_hero — Referência técnica
+# markdown_hero — Technical reference
 
-Esta documentação descreve cada função pública, seus parâmetros, comportamento
-e exemplos de uso. A versão atual é **0.1.0**, Python ≥ 3.10, dialeto-alvo
-**GFM** (GitHub Flavored Markdown).
+This document describes every public function, its parameters, behavior,
+and usage examples. The current version is **0.1.0**, Python ≥ 3.10,
+target dialect **GFM** (GitHub Flavored Markdown).
 
-## Índice
+## Table of contents
 
-1. [`strip`](#strip) — texto plano normalizado
-2. [`extract_chunks`](#extract_chunks) — chunking estrutural
-3. [`word_format`](#word_format) — exportação para .docx
-4. [`markdown_append`](#markdown_append) — concatenação
-5. [`markdown_break`](#markdown_break) — divisão por delimitadores
-6. [`markdown_merge`](#markdown_merge) — append “inteligente”
-7. [Funções de extração](#extracao) — frontmatter, links, imagens, tabelas, código, headings, TOC
-8. [Funções de transformação](#transformacao) — normalize, slugify, shift_headings, strip_*
-9. [Lint e métricas](#lint) — `lint`, `word_count`, `reading_time`
+1. [`strip`](#strip) — normalized plain text
+2. [`extract_chunks`](#extract_chunks) — structural chunking
+3. [`word_format`](#word_format) — Word (.docx) export
+4. [`markdown_append`](#markdown_append) — concatenation
+5. [`markdown_break`](#markdown_break) — split by delimiters
+6. [`markdown_merge`](#markdown_merge) — smart append
+7. [Extraction functions](#extraction) — frontmatter, links, images, tables, code, headings, TOC
+8. [Transformation functions](#transformation) — normalize, slugify, shift_headings, strip_*
+9. [Lint and metrics](#lint) — `lint`, `word_count`, `reading_time`
 10. [CLI](#cli)
-11. [Modelos de dados](#modelos)
-12. [Decisões de design](#design)
-13. [Limites e segurança](#limites)
+11. [Data models](#models)
+12. [Design decisions](#design)
+13. [Limits and security](#limits)
 
 ---
 
@@ -26,39 +26,42 @@ e exemplos de uso. A versão atual é **0.1.0**, Python ≥ 3.10, dialeto-alvo
 
 ## 1. `strip(text, *, keep_numbers=True, keep_math=False, keep_latex_text=False) -> str`
 
-Reduz Markdown a um único texto: minúsculas, sem acentos (NFKD), sem
-pontuação, sem marcação. Múltiplos espaços e quebras viram um espaço único.
+Reduces Markdown to a single line of text: lowercase, no diacritics
+(NFKD), no punctuation, no markup. Runs of whitespace and line breaks
+collapse to a single space.
 
-### Parâmetros
+### Parameters
 
-| Parâmetro | Tipo | Default | Descrição |
+| Parameter | Type | Default | Description |
 |---|---|---|---|
-| `text` | `str` | — | Conteúdo Markdown a normalizar. |
-| `keep_numbers` | `bool` | `True` | Preserva dígitos. |
-| `keep_math` | `bool` | `False` | Preserva sinais matemáticos: `=`, `<`, `>`, `≤`, `≥`, `≠`, `±`, `×`, `÷`, `%`, `°`, `+`, `/`. |
-| `keep_latex_text` | `bool` | `False` | Em vez de remover fórmulas `$...$`/`$$...$$`, desembrulha o conteúdo como texto. |
+| `text` | `str` | — | Markdown content to normalize. |
+| `keep_numbers` | `bool` | `True` | Preserve digits. |
+| `keep_math` | `bool` | `False` | Preserve math symbols: `=`, `<`, `>`, `≤`, `≥`, `≠`, `±`, `×`, `÷`, `%`, `°`, `+`, `/`. |
+| `keep_latex_text` | `bool` | `False` | Instead of removing `$...$` / `$$...$$` formulas, unwrap their content as text. |
 
-### Comportamento
+### Behavior
 
-- Blocos de código, inline code, HTML inline, fórmulas LaTeX, links e imagens
-  são processados antes da normalização.
-- Em links e imagens, o texto/alt é preservado e a URL descartada.
-- Símbolos matemáticos (`=`) **deletam-se sem deixar espaço**, então `p=2` vira `p2`.
-- Pontuação e símbolos genéricos (`.,;:!?()[]{}`) viram espaço.
-- Após NFKD, caracteres não-ASCII residuais são removidos.
+- Code blocks, inline code, inline HTML, LaTeX formulas, links, and
+  images are processed before normalization.
+- For links and images the visible text/alt is preserved and the URL
+  is dropped.
+- Math symbols (`=`) are **deleted with no replacement**, so `p=2`
+  becomes `p2`.
+- Generic punctuation (`.,;:!?()[]{}`) becomes a space.
+- After NFKD, residual non-ASCII characters are removed.
 
-### Exemplo
+### Example
 
 ```python
 from markdown_hero import strip
 
-md = """**Compromisso entre média e máximo.**
-p=1 (média aritmética ponderada) ignora concentração.
-p=2 captura ambos."""
+md = """**Trade-off between mean and max.**
+p=1 (weighted arithmetic mean) ignores risk concentration.
+p=2 captures both."""
 
 strip(md)
-# 'compromisso entre media e maximo p1 media aritmetica ponderada
-#  ignora concentracao p2 captura ambos'
+# 'trade off between mean and max p1 weighted arithmetic mean
+#  ignores risk concentration p2 captures both'
 
 strip(md, keep_math=True)
 # '... p=1 ... p=2 ...'
@@ -73,19 +76,19 @@ strip("A formula $x = y + 1$.", keep_latex_text=True)
 
 ## 2. `extract_chunks(md, *, strategy=None, purpose="generic", max_tokens=0, overlap=0, tokenizer=None, source=None, min_tokens=0) -> list[Chunk]`
 
-Divide um documento em pedaços com metadados estruturais úteis para RAG,
-fine-tuning, sumarização etc.
+Splits a document into pieces with structural metadata that is useful
+for RAG, fine-tuning, summarization, etc.
 
-### Estratégias
+### Strategies
 
-| Estratégia | Comportamento |
+| Strategy | Behavior |
 |---|---|
-| `structural` | Quebra por hierarquia de headings; cada seção vira um chunk. |
-| `semantic` | Agrupa parágrafos até `max_tokens`. |
-| `fixed` | Corte rígido por tokens. |
-| `hybrid` | Estrutural + sub-split por tokens dentro de seções grandes. |
+| `structural` | Splits by heading hierarchy; each section becomes one chunk. |
+| `semantic` | Groups paragraphs up to `max_tokens`. |
+| `fixed` | Hard token-based slicing. |
+| `hybrid` | Structural split plus per-token sub-splitting inside large sections. |
 
-### Defaults por `purpose`
+### Defaults per `purpose`
 
 | `purpose` | `strategy` | `max_tokens` | `overlap` |
 |---|---|---|---|
@@ -94,29 +97,30 @@ fine-tuning, sumarização etc.
 | `summary` | `structural` | 2048 | 0 |
 | `generic` | `structural` | 512 | 0 |
 
-### Parâmetros
+### Parameters
 
-| Parâmetro | Tipo | Descrição |
+| Parameter | Type | Description |
 |---|---|---|
-| `md` | `str` | Markdown completo. |
-| `strategy` | `str \| None` | Sobrescreve a estratégia derivada de `purpose`. |
-| `purpose` | `"rag"\|"finetune"\|"summary"\|"generic"` | Define defaults sensatos. |
-| `max_tokens` | `int` | Override do limite de tokens; `0` usa default do purpose. |
-| `overlap` | `int` | Tokens de sobreposição entre chunks consecutivos da mesma seção. |
-| `tokenizer` | `Callable[[str], int]` | Contador de tokens; default usa `tiktoken` (cl100k_base) se instalado, senão aproximação `len/3.5`. |
-| `source` | `str \| None` | Identificador do documento para gravar em cada chunk. |
-| `min_tokens` | `int` | Quando > 0, mescla chunks menores com o anterior. |
+| `md` | `str` | Full Markdown content. |
+| `strategy` | `str \| None` | Overrides the strategy derived from `purpose`. |
+| `purpose` | `"rag"\|"finetune"\|"summary"\|"generic"` | Sets sensible defaults. |
+| `max_tokens` | `int` | Override the token budget; `0` keeps the purpose default. |
+| `overlap` | `int` | Token overlap between consecutive chunks of the same section. |
+| `tokenizer` | `Callable[[str], int]` | Token counter; default uses `tiktoken` (cl100k_base) when installed, otherwise the approximation `len/3.5`. |
+| `source` | `str \| None` | Document identifier recorded on every chunk. |
+| `min_tokens` | `int` | When > 0, sections smaller than this are merged into the previous chunk. |
 
-### Garantias estruturais
+### Structural guarantees
 
-- **Não quebra dentro de blocos fenced** ou tabelas — eles permanecem íntegros.
-- **Overlap fica restrito à mesma seção** (não cruza headings) para evitar
-  contaminação semântica.
-- **Breadcrumb completo**: cada chunk traz `heading_path = ["Cap", "Seção", ...]`.
-- **Oversized**: se um único bloco excede `max_tokens` e não pode ser dividido,
-  o chunk recebe `oversized=True`.
+- **Never splits inside fenced blocks** or tables — they remain intact.
+- **Overlap is restricted to the same section** (it does not cross
+  headings) to avoid semantic contamination.
+- **Full breadcrumb**: every chunk carries `heading_path = ["Cap",
+  "Section", ...]`.
+- **Oversized**: when a single block exceeds `max_tokens` and cannot be
+  subdivided, the chunk has `oversized=True`.
 
-### Exemplo
+### Example
 
 ```python
 from markdown_hero import extract_chunks
@@ -127,12 +131,14 @@ for c in chunks:
     print(c.text[:80])
 ```
 
-### Boas práticas para RAG
+### Best practices for RAG
 
-- Use `purpose="rag"` (estrutural + sub-split + overlap pequeno).
-- Indexe `heading_path` como metadado: filtros por seção dão grandes ganhos.
-- Para documentos heterogêneos (código + prosa), o campo `type` permite roteamento
-  diferente no embedding/recuperação.
+- Use `purpose="rag"` (structural + sub-split + small overlap).
+- Index `heading_path` as metadata: filtering by section yields large
+  retrieval gains.
+- For heterogeneous documents (code + prose), the `type` field allows
+  routing different content kinds through different embedding models or
+  retrieval pipelines.
 
 ---
 
@@ -140,18 +146,19 @@ for c in chunks:
 
 ## 3. `word_format(md, output_path, *, template=None, style_overrides=None) -> Path`
 
-Renderiza Markdown em `.docx` com um conjunto de estilos profissionais.
+Renders Markdown into a `.docx` file with a professional default style
+set.
 
-### Parâmetros
+### Parameters
 
-| Parâmetro | Tipo | Descrição |
+| Parameter | Type | Description |
 |---|---|---|
-| `md` | `str \| Path` | Conteúdo ou caminho de arquivo Markdown. |
-| `output_path` | `str \| Path` | Destino do `.docx`. |
-| `template` | `str \| Path \| None` | Template `.docx` cujos estilos serão usados como base. |
-| `style_overrides` | `dict \| None` | Sobrescreve chaves do dicionário `DEFAULT_STYLES`. |
+| `md` | `str \| Path` | Markdown content or path to a Markdown file. |
+| `output_path` | `str \| Path` | Destination of the `.docx`. |
+| `template` | `str \| Path \| None` | `.docx` template whose styles are used as the base. |
+| `style_overrides` | `dict \| None` | Overrides keys of the `DEFAULT_STYLES` dictionary. |
 
-### Conjunto de estilos default (`DEFAULT_STYLES`)
+### Default style set (`DEFAULT_STYLES`)
 
 ```python
 {
@@ -168,35 +175,35 @@ Renderiza Markdown em `.docx` com um conjunto de estilos profissionais.
 }
 ```
 
-### Mapeamento Markdown → estilo Word
+### Markdown → Word style mapping
 
-| Elemento | Estilo Word | Detalhes |
+| Element | Word style | Details |
 |---|---|---|
-| `# H1`–`###### H6` | `Heading 1`–`Heading 6` | Tamanhos por nível, **bold**. |
-| Parágrafo | `Normal` | Calibri 11pt. |
-| **bold**, *italic*, ~~strike~~ | inline runs | aplicado caractere a caractere. |
-| `inline code` | run com `Code Char` | Consolas 10pt, fundo `#F5F5F5`. |
-| ```` ```bloco``` ```` | `Code Block` (custom) | Consolas 10pt, fundo `#F5F5F5`. |
-| `> citação` | `Quote` | Itálico, recuo. |
-| `- lista` / `1. lista` | `List Bullet` / `List Number` | Estilos nativos do Word. |
-| Tabela | `Table Grid` + cabeçalho `#E7E6E6` | Cabeçalho **bold**, repete em quebras de página. |
-| `Table: legenda` | `Caption` | Centralizado, itálico, 10pt, acima da tabela. |
-| Link | run com hyperlink | Azul `#0563C1`, sublinhado. |
-| `---` | `Horizontal rule` | Borda inferior. |
+| `# H1`–`###### H6` | `Heading 1`–`Heading 6` | Per-level sizes, **bold**. |
+| Paragraph | `Normal` | Calibri 11pt. |
+| **bold**, *italic*, ~~strike~~ | inline runs | Applied per character run. |
+| `inline code` | run with `Code Char` | Consolas 10pt, background `#F5F5F5`. |
+| ```` ```block``` ```` | `Code Block` (custom) | Consolas 10pt, background `#F5F5F5`. |
+| `> quote` | `Quote` | Italic, indented. |
+| `- list` / `1. list` | `List Bullet` / `List Number` | Native Word styles. |
+| Table | `Table Grid` + header `#E7E6E6` | Bold header, repeats across page breaks. |
+| `Table: caption` | `Caption` | Centered, italic, 10pt, above the table. |
+| Link | run with hyperlink | Blue `#0563C1`, underlined. |
+| `---` | Horizontal rule | Bottom border on a paragraph. |
 
-### Exemplo
+### Example
 
 ```python
 from markdown_hero import word_format
-word_format("relatorio.md", "relatorio.docx")
+word_format("report.md", "report.docx")
 
-# Com template do usuário (preserva cabeçalho/rodapé/marca):
-word_format("relatorio.md", "relatorio.docx", template="empresa-base.docx")
+# With a user template (preserves header / footer / branding):
+word_format("report.md", "report.docx", template="company-base.docx")
 
-# Sobrescrevendo estilos:
+# Overriding styles:
 word_format(
-    "relatorio.md",
-    "relatorio.docx",
+    "report.md",
+    "report.docx",
     style_overrides={"body_size": 12, "code_bg": "EFEFEF"},
 )
 ```
@@ -207,33 +214,33 @@ word_format(
 
 ## 4. `markdown_append(*paths, output, separator="\n\n", frontmatter="merge", headings="shift") -> Path`
 
-Concatena vários arquivos Markdown em um único arquivo de saída.
+Concatenates several Markdown files into a single output file.
 
-### Modos de `frontmatter`
+### `frontmatter` modes
 
-| Valor | Comportamento |
+| Value | Behavior |
 |---|---|
-| `merge` (default) | Combina todos em um único bloco. Conflitos preservam o primeiro e listam em `_conflicts`. |
-| `first` | Mantém só o frontmatter do primeiro arquivo. |
-| `drop` | Remove de todos. |
-| `all` | Preserva cada bloco sequencialmente (raramente útil). |
+| `merge` (default) | Combines every block into a single mapping. Conflicts keep the first value and list the colliding keys under `_conflicts`. |
+| `first` | Keeps only the frontmatter from the first file. |
+| `drop` | Removes frontmatter from all files. |
+| `all` | Preserves each block sequentially (rarely useful). |
 
-### Modos de `headings`
+### `headings` modes
 
-| Valor | Comportamento |
+| Value | Behavior |
 |---|---|
-| `shift` (default) | Se o primeiro arquivo tem H1, os demais sofrem shift +1 para evitar dois H1. |
-| `preserve` | Não altera headings. |
-| `wrap` | Cada arquivo entra como uma seção sob `# {filename ou title do frontmatter}`. |
+| `shift` (default) | If the first file has an H1, the others are shifted by +1 to avoid duplicate H1s. |
+| `preserve` | Does not change headings. |
+| `wrap` | Each file is inserted as a section under `# {filename or frontmatter title}`. |
 
-### Exemplo
+### Example
 
 ```python
 from markdown_hero import markdown_append
 
 markdown_append(
-    "intro.md", "cap1.md", "cap2.md",
-    output="livro.md",
+    "intro.md", "ch1.md", "ch2.md",
+    output="book.md",
     frontmatter="merge",
     headings="shift",
 )
@@ -245,42 +252,42 @@ markdown_append(
 
 ## 5. `markdown_break(path, delimiter, *, include_delimiter="none", output_dir, name_pattern="{stem}_{i:03d}.md", frontmatter="replicate", is_regex=False) -> list[Path]`
 
-Quebra um arquivo Markdown em **N+1** partes nos pontos onde o delimitador
-ocorre **N** vezes.
+Splits a Markdown file into **N+1** parts wherever the delimiter occurs
+**N** times.
 
-### Parâmetros
+### Parameters
 
-| Parâmetro | Tipo | Descrição |
+| Parameter | Type | Description |
 |---|---|---|
-| `delimiter` | `str \| re.Pattern \| Iterable` | Aceita string literal, regex compilado ou lista misturando os dois. |
-| `is_regex` | `bool` | Quando `True`, interpreta a string como regex (com flag `re.MULTILINE`). |
-| `include_delimiter` | `"before"\|"after"\|"none"` | Onde fica o texto do delimitador (final do anterior, início do próximo, ou descartado). |
-| `output_dir` | `str \| Path` | Diretório de destino (criado se necessário). |
-| `name_pattern` | `str` | Template do nome de cada parte. Recebe `stem` (do arquivo original) e `i` (índice). |
-| `frontmatter` | `"replicate"\|"first"\|"drop"` | Tratamento do YAML frontmatter. Em `replicate`, cada parte ganha `part: i` e `part_of: N`. |
+| `delimiter` | `str \| re.Pattern \| Iterable` | Accepts a literal string, a compiled regex, or a list mixing both. |
+| `is_regex` | `bool` | When `True`, a string is interpreted as a regex (with the `re.MULTILINE` flag). |
+| `include_delimiter` | `"before"\|"after"\|"none"` | Where the delimiter text goes (end of previous part, start of next, or discarded). |
+| `output_dir` | `str \| Path` | Output directory (created on demand). |
+| `name_pattern` | `str` | Filename template. Receives `stem` (from the source file) and `i` (index). |
+| `frontmatter` | `"replicate"\|"first"\|"drop"` | YAML frontmatter handling. With `replicate` each part receives `part: i` and `part_of: N`. |
 
-### Tratamento de espaços
+### Whitespace handling
 
-Cada parte é gerada com `lstrip`/`rstrip` removendo espaços e quebras nas
-bordas — exatamente como você especificou: a separação termina no último
-caractere visível antes do delimitador e começa no primeiro depois.
+Each part is written with `lstrip` / `rstrip` so the previous part ends
+at the last visible character before the delimiter and the next part
+starts at the first visible character after it.
 
-### Exemplo
+### Example
 
 ```python
 from markdown_hero import markdown_break
 
-# 1) Quebra por separador literal
-markdown_break("livro.md", "---SEP---", output_dir="partes/")
+# 1) Split on a literal separator
+markdown_break("book.md", "---SEP---", output_dir="parts/")
 
-# 2) Quebra por regex em headings de nível 1
+# 2) Split on a regex matching level-1 headings
 markdown_break(
-    "livro.md", r"^# .+$", is_regex=True,
-    include_delimiter="after", output_dir="capitulos/",
-    name_pattern="cap_{i:02d}.md",
+    "book.md", r"^# .+$", is_regex=True,
+    include_delimiter="after", output_dir="chapters/",
+    name_pattern="ch_{i:02d}.md",
 )
 
-# 3) Múltiplos delimitadores
+# 3) Multiple delimiters
 markdown_break("doc.md", ["===", "---END---"], output_dir="parts/")
 ```
 
@@ -290,11 +297,13 @@ markdown_break("doc.md", ["===", "---END---"], output_dir="parts/")
 
 ## 6. `markdown_merge(*paths, output, dedupe_headings=True, rebuild_toc=False, separator="\n\n") -> Path`
 
-Append “inteligente”: usa `markdown_append` com merge de frontmatter e shift
-de headings, e adicionalmente:
+Smart append: uses `markdown_append` with frontmatter merging and
+heading shifting, plus:
 
-- **Dedupe de headings**: remove seções com heading idêntico **consecutivo**.
-- **TOC opcional**: regenera um sumário marcado por `<!-- TOC -->` / `<!-- /TOC -->`.
+- **Heading dedupe**: removes consecutive sections that share the same
+  heading.
+- **Optional TOC**: rebuilds a table of contents wrapped in
+  `<!-- TOC -->` / `<!-- /TOC -->` markers.
 
 ```python
 from markdown_hero import markdown_merge
@@ -304,26 +313,27 @@ markdown_merge("a.md", "b.md", output="merged.md", rebuild_toc=True)
 
 ---
 
-<a id="extracao"></a>
+<a id="extraction"></a>
 
-## 7. Funções de extração
+## 7. Extraction functions
 
-| Função | Retorno |
+| Function | Returns |
 |---|---|
-| `extract_frontmatter(md)` | `dict` (vazio se não houver) |
-| `remove_frontmatter(md)` | `(corpo, metadados)` |
+| `extract_frontmatter(md)` | `dict` (empty when absent) |
+| `remove_frontmatter(md)` | `(body, metadata)` |
 | `extract_links(md)` | `list[Link]` (inline + autolink) |
 | `extract_images(md)` | `list[Image]` |
-| `extract_tables(md)` | `list[Table]` (com `headers`, `rows`, `alignments`) |
-| `extract_code_blocks(md, language=None)` | `list[CodeBlock]` (filtrável por linguagem) |
-| `extract_headings(md)` | `list[Heading]` (com nível, anchor estilo GitHub) |
+| `extract_tables(md)` | `list[Table]` (with `headers`, `rows`, `alignments`) |
+| `extract_code_blocks(md, language=None)` | `list[CodeBlock]` (filterable by language) |
+| `extract_headings(md)` | `list[Heading]` (with level and GitHub-style anchor) |
 | `build_toc(md, max_depth=3)` | `str` (Markdown) |
 
-Todos ignoram conteúdo dentro de blocos fenced (matches em `print("[link](x)")`
-não são extraídos como link).
+All ignore content inside fenced code blocks (matches in
+`print("[link](x)")` are not returned as links).
 
 ```python
 from markdown_hero import extract_links, build_toc
+
 for link in extract_links(open("doc.md").read()):
     print(link.line, link.url)
 
@@ -332,52 +342,53 @@ print(build_toc(open("doc.md").read(), max_depth=2))
 
 ---
 
-<a id="transformacao"></a>
+<a id="transformation"></a>
 
-## 8. Funções de transformação
+## 8. Transformation functions
 
-| Função | Descrição |
+| Function | Description |
 |---|---|
-| `normalize(md, unify_lists=True, trim_trailing=True, collapse_blank_lines=True)` | Padroniza espaços/marcadores. |
-| `slugify(text)` | Slug compatível com GitHub/Pandoc. |
-| `shift_headings(md, by)` | Rebaixa/eleva headings, ignorando blocos de código; clamp em [1, 6]. |
-| `strip_html(md)` | Remove tags HTML inline. |
-| `strip_images(md, keep_alt=True)` | Remove imagens (mantendo o alt opcionalmente). |
-| `strip_links(md, keep_text=True)` | Remove links (mantendo o texto opcionalmente). |
-| `strip_code_blocks(md, keep_inline=False)` | Remove blocos fenced; opcionalmente também inline code. |
-| `md_to_plain(md)` | Texto plano preservando parágrafos (mais leve que `strip`). |
+| `normalize(md, unify_lists=True, trim_trailing=True, collapse_blank_lines=True)` | Standardizes whitespace and list markers. |
+| `slugify(text)` | GitHub/Pandoc-compatible slug. |
+| `shift_headings(md, by)` | Demote/promote headings, ignoring code blocks; clamped to [1, 6]. |
+| `strip_html(md)` | Removes inline HTML tags. |
+| `strip_images(md, keep_alt=True)` | Removes images (optionally keeping alt text). |
+| `strip_links(md, keep_text=True)` | Removes links (optionally keeping link text). |
+| `strip_code_blocks(md, keep_inline=False)` | Removes fenced blocks; optionally inline code as well. |
+| `md_to_plain(md)` | Plain text preserving paragraph breaks (lighter than `strip`). |
 
 ---
 
 <a id="lint"></a>
 
-## 9. Lint e métricas
+## 9. Lint and metrics
 
 ### `lint(md) -> list[Issue]`
 
-Detecta:
+Detects:
 
-| Regra | Severidade | Descrição |
+| Rule | Severity | Description |
 |---|---|---|
-| `heading-skip` | warning | H1 → H3 sem H2 intermediário, etc. |
-| `duplicate-anchor` | warning | Dois headings geram a mesma âncora. |
+| `heading-skip` | warning | H1 → H3 with no intermediate H2, etc. |
+| `duplicate-anchor` | warning | Two headings produce the same anchor. |
 | `empty-link-text` | warning | `[](url)` |
-| `empty-link-url` | warning | `[texto]()` ou `[texto](#)` |
-| `unclosed-fence` | error | Bloco de código sem fechamento. |
+| `empty-link-url` | warning | `[text]()` or `[text](#)` |
+| `unclosed-fence` | error | Code fence opened but not closed. |
 
 ```python
 from markdown_hero import lint
+
 for issue in lint(open("doc.md").read()):
     print(f"L{issue.line} {issue.severity}: {issue.rule} — {issue.message}")
 ```
 
 ### `word_count(md, ignore_code=True) -> int`
 
-Conta palavras do conteúdo textual, ignorando blocos de código por default.
+Counts text words, ignoring code blocks by default.
 
 ### `reading_time(md, wpm=200) -> float`
 
-Tempo de leitura em minutos (200 WPM ≈ leitor médio em prosa).
+Reading time estimate in minutes (200 WPM ≈ average prose reader).
 
 ---
 
@@ -398,39 +409,40 @@ markdown-hero lint    <input> [--json] [-o OUT]
 markdown-hero stats   <input>
 ```
 
-Use `-` como `<input>` para ler de stdin.
+Use `-` as `<input>` to read from stdin.
 
 ```bash
-echo "**oi**" | markdown-hero strip -
-# oi
+echo "**hi**" | markdown-hero strip -
+# hi
 
 markdown-hero chunk doc.md --purpose rag --max-tokens 512 -o chunks.json
-markdown-hero word doc.md -o doc.docx --template empresa.docx
-markdown-hero break livro.md "## " --regex --include after --output-dir secoes/
+markdown-hero word doc.md -o doc.docx --template company.docx
+markdown-hero break book.md "## " --regex --include after --output-dir sections/
 ```
 
-`lint` retorna **exit code 1** quando há issues `error` (útil em CI).
+`lint` returns **exit code 1** when there are `error` issues (useful in
+CI).
 
 ---
 
-<a id="modelos"></a>
+<a id="models"></a>
 
-## 11. Modelos de dados
+## 11. Data models
 
 ```python
-@dataclass
+@dataclass(frozen=True)
 class Link:        text: str; url: str; title: str|None; line: int; type: Literal["inline","reference","autolink"]
 
-@dataclass
+@dataclass(frozen=True)
 class Image:       alt: str; url: str; title: str|None; line: int
 
-@dataclass
+@dataclass(frozen=True)
 class Table:       headers: list[str]; rows: list[list[str]]; alignments: list[str]; line: int
 
-@dataclass
+@dataclass(frozen=True)
 class CodeBlock:   code: str; language: str|None; line: int; fenced: bool
 
-@dataclass
+@dataclass(frozen=True)
 class Heading:     level: int; text: str; line: int; anchor: str
 
 @dataclass
@@ -450,57 +462,59 @@ class Chunk:
 
 <a id="design"></a>
 
-## 12. Decisões de design
+## 12. Design decisions
 
-- **Dialeto-alvo**: GFM. Cobre 95% dos casos reais (GitHub, Obsidian, Notion
-  export). MyST/CommonMark não estão totalmente suportados na 0.1.
-- **Dependências mínimas**: `markdown-it-py`, `mdit-py-plugins`, `python-docx`,
-  `PyYAML`. `tiktoken` é opcional (extra `tokenizers`).
-- **Idioma**: `strip` é multilíngue via `unicodedata.NFKD` — não há tabela
-  específica para PT.
-- **Símbolos matemáticos**: por default são deletados sem deixar espaço, o
-  que une tokens (`p=2` → `p2`). Com `keep_math=True` são preservados.
-- **Pontuação genérica**: vira espaço, depois espaços são colapsados.
-- **Blocos de código** são intocados pelas funções de transformação (`shift_headings`,
-  `strip_html`, etc.). Isso evita corromper conteúdo técnico.
-- **Frontmatter**: detectado **somente no início** do arquivo, delimitado por
-  `---` em linhas próprias.
-- **Ordem dos resultados**: `extract_*` retorna na ordem de aparição no documento,
-  com `line` 1-based.
+- **Target dialect**: GFM. It covers 95% of real-world cases (GitHub,
+  Obsidian, Notion export). MyST and CommonMark are not fully supported
+  in 0.1.
+- **Minimal dependencies**: `markdown-it-py`, `mdit-py-plugins`,
+  `python-docx`, `PyYAML`. `tiktoken` is optional (`tokenizers` extra).
+- **Language**: `strip` is multilingual via `unicodedata.NFKD` — there
+  is no per-language table.
+- **Math symbols**: deleted with no replacement by default, joining
+  adjacent tokens (`p=2` → `p2`). With `keep_math=True` they are
+  preserved.
+- **Generic punctuation**: becomes a space, then runs of whitespace
+  collapse.
+- **Code blocks** are untouched by transformation functions
+  (`shift_headings`, `strip_html`, etc.). This avoids corrupting
+  technical content.
+- **Frontmatter**: detected **only at the very top** of the file,
+  delimited by `---` on their own lines.
+- **Result ordering**: `extract_*` returns items in document order with
+  `line` 1-based.
 
 ---
 
-<a id="limites"></a>
+<a id="limits"></a>
 
-## 13. Limites e considerações de segurança
+## 13. Limits and security considerations
 
-### Tamanho de arquivo
+### File size
 
-`markdown_hero` carrega o documento inteiro em memória (`Path.read_text`).
-Não há suporte a streaming. Para documentos típicos (até alguns MB) isso
-é adequado e mantém a API simples; para arquivos muito grandes
-(centenas de MB), recomenda-se quebrar previamente o conteúdo com
-ferramentas externas antes de chamar a biblioteca.
+`markdown_hero` reads the whole document into memory (`Path.read_text`).
+There is no streaming. For typical documents (up to a few MB) this is
+adequate and keeps the API simple; for very large files (hundreds of MB)
+break the content with external tools before calling the library.
 
-### `markdown_break` com `is_regex=True` e input não confiável
+### `markdown_break` with `is_regex=True` and untrusted input
 
-Quando `is_regex=True`, o argumento `delimiter` é compilado diretamente
-via `re.compile`. **Não passe input não confiável** (vindo de usuários
-finais sem validação) como regex: padrões maliciosos podem causar
-*ReDoS* (exponential backtracking). Se a entrada vem de um usuário,
-mantenha o default `is_regex=False` ou valide o padrão antes.
+When `is_regex=True`, the `delimiter` argument is compiled directly via
+`re.compile`. **Do not pass untrusted input** (coming from end users
+without validation) as a regex: malicious patterns can cause *ReDoS*
+(exponential backtracking). If the input comes from a user, keep the
+default `is_regex=False` or validate the pattern first.
 
-### Frontmatter e YAML
+### Frontmatter and YAML
 
-`extract_frontmatter` usa `yaml.safe_load` (não `yaml.load`), o que
-impede deserialização de objetos Python arbitrários. Mesmo assim,
-valide o conteúdo antes de usar valores em operações sensíveis (ex.:
-montar paths a partir de `metadata["filename"]`).
+`extract_frontmatter` uses `yaml.safe_load` (not `yaml.load`), which
+prevents deserialization of arbitrary Python objects. Even so, validate
+the contents before using values in sensitive operations (for example,
+building paths from `metadata["filename"]`).
 
-### Limitação do parser
+### Parser limitation
 
-A biblioteca usa expressões regulares para o reconhecimento estrutural
-em vez de um parser CommonMark/GFM completo. Cobre o subconjunto
-documentado em `docs/reference.md` mas pode divergir de implementações
-de referência em casos extremos (listas profundamente aninhadas,
-HTML inline complexo, links de referência em múltiplas linhas).
+The library uses regular expressions for structural recognition rather
+than a full CommonMark/GFM parser. It covers the subset documented in
+this file but may diverge from reference implementations on edge cases
+(deeply nested lists, complex inline HTML, multi-line reference links).
