@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Released]
 
 ## [0.1.0] - 2026-05-01
 
@@ -45,5 +45,5 @@ project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Documentation in `docs/reference.md` (full API reference) and
   `docs/helpers.md` (canonical index of internal utilities).
 
-[Unreleased]: https://github.com/leobr84p/markdown_hero/compare/v0.1.0...HEAD
+[Released]: https://github.com/leobr84p/markdown_hero/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/leobr84p/markdown_hero/releases/tag/v0.1.0
